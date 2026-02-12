@@ -34,6 +34,19 @@
       "editor": "stringList",
       "prefill": []
     },
+    "apiKeyEnabled": {
+      "title": "API key auth enabled",
+      "type": "boolean",
+      "description": "Require API key on protected API endpoints.",
+      "default": false
+    },
+    "apiKey": {
+      "title": "API key",
+      "type": "string",
+      "description": "Expected API key value for `x-api-key` or Bearer auth.",
+      "default": "",
+      "isSecret": true
+    },
     "browserPoolEnabled": {
       "title": "Browser pool enabled",
       "type": "boolean",
@@ -117,6 +130,30 @@
       "type": "integer",
       "description": "Max time per queued task before timeout.",
       "default": 15000
+    },
+    "fetchTimeoutDefaultMs": {
+      "title": "Fetch timeout default (ms)",
+      "type": "integer",
+      "description": "Default timeout for `POST /v1/fetch` when request omits `timeout_ms`.",
+      "default": 8000
+    },
+    "fetchTimeoutMinMs": {
+      "title": "Fetch timeout min (ms)",
+      "type": "integer",
+      "description": "Minimum accepted `timeout_ms` for `POST /v1/fetch`.",
+      "default": 1000
+    },
+    "fetchTimeoutMaxMs": {
+      "title": "Fetch timeout max (ms)",
+      "type": "integer",
+      "description": "Maximum accepted `timeout_ms` for `POST /v1/fetch`.",
+      "default": 15000
+    },
+    "requestBodyMaxBytes": {
+      "title": "Request body max bytes",
+      "type": "integer",
+      "description": "Maximum JSON body size accepted by API endpoints.",
+      "default": 1000000
     },
     "shutdownDrainTimeoutMs": {
       "title": "Shutdown drain timeout (ms)",

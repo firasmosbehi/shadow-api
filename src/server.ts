@@ -1,14 +1,18 @@
-import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
-import type { RuntimeConfig } from "./types";
+import { createMeta, createSuccessEnvelope } from "./api/envelope";
+import { createFetchRequestValidator } from "./api/schema-validation";
 import type { FetchRequestInput } from "./extraction/types";
 import {
+  AuthInvalidError,
+  AuthRequiredError,
   NotFoundError,
   ShuttingDownError,
   ValidationError,
   normalizeError,
   toErrorBody,
 } from "./runtime/errors";
+import type { RuntimeConfig } from "./types";
 
 export interface ServerRuntimeState {
   getQueueDepth: () => number;
@@ -28,24 +32,36 @@ const json = (res: ServerResponse, statusCode: number, body: unknown): void => {
   res.end(JSON.stringify(body));
 };
 
-const sendError = (res: ServerResponse, error: unknown): void => {
+const sendError = (
+  res: ServerResponse,
+  requestId: string,
+  error: unknown,
+  metaExtras: Record<string, unknown> = {},
+): void => {
   const appError = normalizeError(error);
-  json(res, appError.statusCode, toErrorBody(appError));
+  json(
+    res,
+    appError.statusCode,
+    toErrorBody(appError, createMeta(requestId, metaExtras)),
+  );
 };
 
 const readJsonBody = async (
   req: IncomingMessage,
-  options: { maxBytes?: number } = {},
+  options: { maxBytes: number },
 ): Promise<unknown> => {
-  const maxBytes = options.maxBytes ?? 1_000_000;
   const chunks: Buffer[] = [];
   let size = 0;
 
   await new Promise<void>((resolve, reject) => {
     req.on("data", (chunk: Buffer) => {
       size += chunk.length;
-      if (size > maxBytes) {
-        reject(new ValidationError("Request body exceeds max size.", { maxBytes }));
+      if (size > options.maxBytes) {
+        reject(
+          new ValidationError("Request body exceeds max size.", {
+            maxBytes: options.maxBytes,
+          }),
+        );
         return;
       }
       chunks.push(chunk);
@@ -66,74 +82,93 @@ const readJsonBody = async (
   }
 };
 
-const validateFetchRequest = (payload: unknown): FetchRequestInput => {
-  if (!payload || typeof payload !== "object") {
-    throw new ValidationError("Fetch request payload must be a JSON object.");
+const extractClientApiKey = (req: IncomingMessage): string | null => {
+  const xApiKey = req.headers["x-api-key"];
+  if (typeof xApiKey === "string" && xApiKey.trim().length > 0) {
+    return xApiKey.trim();
   }
 
-  const body = payload as Record<string, unknown>;
-  const source = typeof body.source === "string" ? body.source.trim() : "";
-  const operation = typeof body.operation === "string" ? body.operation.trim() : "";
-  const target =
-    body.target && typeof body.target === "object" ? (body.target as Record<string, unknown>) : null;
-
-  if (!source) {
-    throw new ValidationError("`source` is required and must be a non-empty string.");
-  }
-  if (!operation) {
-    throw new ValidationError("`operation` is required and must be a non-empty string.");
-  }
-  if (!target) {
-    throw new ValidationError("`target` is required and must be an object.");
+  const auth = req.headers.authorization;
+  if (typeof auth === "string") {
+    const match = auth.match(/^Bearer\s+(.+)$/i);
+    if (match && match[1].trim().length > 0) {
+      return match[1].trim();
+    }
   }
 
-  const fields =
-    Array.isArray(body.fields) && body.fields.every((entry) => typeof entry === "string")
-      ? (body.fields as string[])
-      : undefined;
-  const freshness = typeof body.freshness === "string" ? body.freshness : undefined;
-  const timeout_ms = typeof body.timeout_ms === "number" ? body.timeout_ms : undefined;
-
-  return { source, operation, target, fields, freshness, timeout_ms };
+  return null;
 };
 
-const notFound = (req: IncomingMessage, res: ServerResponse): void =>
-  sendError(
-    res,
-    new NotFoundError(`Route not found: ${req.method ?? "GET"} ${req.url ?? "/"}`, {
-      path: req.url ?? "/",
-      method: req.method ?? "GET",
-    }),
-  );
+const isPublicRoute = (method: string, path: string): boolean =>
+  method === "GET" && (path === "/v1/health" || path === "/v1/ready");
+
+const ensureAuthorized = (runtime: RuntimeConfig, req: IncomingMessage, path: string): void => {
+  if (!runtime.apiKeyEnabled) return;
+  if (isPublicRoute(req.method ?? "GET", path)) return;
+
+  const expected = runtime.apiKey;
+  if (!expected) {
+    throw new AuthRequiredError({
+      reason: "API key auth is enabled but API key is not configured.",
+    });
+  }
+
+  const provided = extractClientApiKey(req);
+  if (!provided) {
+    throw new AuthRequiredError({
+      acceptedHeaders: ["x-api-key", "Authorization: Bearer <key>"],
+    });
+  }
+  if (provided !== expected) {
+    throw new AuthInvalidError({
+      acceptedHeaders: ["x-api-key", "Authorization: Bearer <key>"],
+    });
+  }
+};
+
+const notFound = (req: IncomingMessage): NotFoundError =>
+  new NotFoundError(`Route not found: ${req.method ?? "GET"} ${req.url ?? "/"}`, {
+    path: req.url ?? "/",
+    method: req.method ?? "GET",
+  });
 
 export const createApiServer = (runtime: RuntimeConfig, state: ServerRuntimeState): Server => {
-  const startedAt = new Date();
+  const startedAt = Date.now();
+  const validateFetchRequest = createFetchRequestValidator({
+    minMs: runtime.fetchTimeoutMinMs,
+    maxMs: runtime.fetchTimeoutMaxMs,
+    defaultMs: runtime.fetchTimeoutDefaultMs,
+  });
 
-  return createServer((req, res) => {
-    const requestId = `req_${randomUUID()}`;
+  const handle = async (
+    req: IncomingMessage,
+    res: ServerResponse,
+    requestId: string,
+  ): Promise<void> => {
     const method = req.method ?? "GET";
-    const path = req.url ?? "/";
+    const parsedUrl = new URL(req.url ?? "/", "http://shadow-api.local");
+    const path = parsedUrl.pathname;
+
+    ensureAuthorized(runtime, req, path);
 
     if (method === "GET" && path === "/v1/health") {
-      json(res, 200, {
-        ok: true,
-        data: {
+      json(
+        res,
+        200,
+        createSuccessEnvelope(requestId, {
           status: "ok",
-          uptime_s: Math.floor((Date.now() - startedAt.getTime()) / 1000),
-        },
-        error: null,
-        meta: {
-          timestamp: new Date().toISOString(),
-          version: "0.1.0",
-        },
-      });
+          uptime_s: Math.floor((Date.now() - startedAt) / 1000),
+          api_key_enabled: runtime.apiKeyEnabled,
+        }),
+      );
       return;
     }
 
     if (method === "GET" && path === "/v1/ready") {
-      json(res, 200, {
-        ok: true,
-        data: {
+      json(
+        res,
+        200,
+        createSuccessEnvelope(requestId, {
           ready: !state.isShuttingDown(),
           queue_depth: state.getQueueDepth(),
           queue_inflight: state.getQueueInflight(),
@@ -143,83 +178,79 @@ export const createApiServer = (runtime: RuntimeConfig, state: ServerRuntimeStat
           shutting_down: state.isShuttingDown(),
           host: runtime.host,
           port: runtime.port,
-        },
-        error: null,
-        meta: {
-          request_id: requestId,
-          timestamp: new Date().toISOString(),
-          version: "0.1.0",
-        },
-      });
-      return;
-    }
-
-  if (method === "GET" && path === "/v1/debug/queue") {
-    json(res, 200, {
-      ok: true,
-      data: {
-          queue_depth: state.getQueueDepth(),
-          queue_inflight: state.getQueueInflight(),
-          shutting_down: state.isShuttingDown(),
-        },
-        error: null,
-        meta: {
-          request_id: requestId,
-          timestamp: new Date().toISOString(),
-          version: "0.1.0",
-        },
-      });
-      return;
-    }
-
-    if (method === "GET" && path === "/v1/adapters/health") {
-      json(res, 200, {
-        ok: true,
-        data: {
-          adapters: state.getAdapterHealth(),
-        },
-        error: null,
-        meta: {
-          request_id: requestId,
-          timestamp: new Date().toISOString(),
-          version: "0.1.0",
-        },
-      });
-      return;
-    }
-
-    if (method === "POST" && path === "/v1/fetch") {
-      state.onActivity();
-      void (async () => {
-        try {
-          if (state.isShuttingDown()) {
-            throw new ShuttingDownError();
-          }
-
-          const payload = await readJsonBody(req);
-          const fetchRequest = validateFetchRequest(payload);
-          const result = await state.enqueueFetch(fetchRequest);
-
-          json(res, 200, {
-            ok: true,
-            data: result,
-            error: null,
-            meta: {
-              request_id: requestId,
-              queue_depth: state.getQueueDepth(),
-              queue_inflight: state.getQueueInflight(),
-              timestamp: new Date().toISOString(),
-              version: "0.1.0",
-            },
-          });
-        } catch (error) {
-          sendError(res, error);
-        }
-      })();
+          timeout_policy: {
+            fetch_default_ms: runtime.fetchTimeoutDefaultMs,
+            fetch_min_ms: runtime.fetchTimeoutMinMs,
+            fetch_max_ms: runtime.fetchTimeoutMaxMs,
+          },
+        }),
+      );
       return;
     }
 
     state.onActivity();
-    notFound(req, res);
+
+    if (method === "GET" && path === "/v1/debug/queue") {
+      json(
+        res,
+        200,
+        createSuccessEnvelope(requestId, {
+          queue_depth: state.getQueueDepth(),
+          queue_inflight: state.getQueueInflight(),
+          shutting_down: state.isShuttingDown(),
+        }),
+      );
+      return;
+    }
+
+    if (method === "GET" && path === "/v1/adapters/health") {
+      json(
+        res,
+        200,
+        createSuccessEnvelope(requestId, {
+          adapters: state.getAdapterHealth(),
+        }),
+      );
+      return;
+    }
+
+    if (method === "POST" && path === "/v1/fetch") {
+      if (state.isShuttingDown()) {
+        throw new ShuttingDownError();
+      }
+
+      const payload = await readJsonBody(req, {
+        maxBytes: runtime.requestBodyMaxBytes,
+      });
+      const fetchRequest = validateFetchRequest(payload);
+      const result = await state.enqueueFetch(fetchRequest);
+
+      json(
+        res,
+        200,
+        createSuccessEnvelope(
+          requestId,
+          result,
+          {
+            queue_depth: state.getQueueDepth(),
+            queue_inflight: state.getQueueInflight(),
+            timeout_ms: fetchRequest.timeout_ms,
+          },
+        ),
+      );
+      return;
+    }
+
+    throw notFound(req);
+  };
+
+  return createServer((req, res) => {
+    const requestId = `req_${randomUUID()}`;
+    void handle(req, res, requestId).catch((error: unknown) => {
+      sendError(res, requestId, error, {
+        path: req.url ?? "/",
+        method: req.method ?? "GET",
+      });
+    });
   });
 };

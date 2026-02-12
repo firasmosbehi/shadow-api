@@ -3,6 +3,8 @@ export interface ActorInput {
   port?: number;
   logLevel?: "DEBUG" | "INFO" | "WARNING" | "ERROR";
   requiredEnvVars?: string[];
+  apiKeyEnabled?: boolean;
+  apiKey?: string;
   browserPoolEnabled?: boolean;
   browserPoolSize?: number;
   browserHeadless?: boolean;
@@ -17,6 +19,10 @@ export interface ActorInput {
   requestQueueConcurrency?: number;
   requestQueueMaxSize?: number;
   requestQueueTaskTimeoutMs?: number;
+  fetchTimeoutDefaultMs?: number;
+  fetchTimeoutMinMs?: number;
+  fetchTimeoutMaxMs?: number;
+  requestBodyMaxBytes?: number;
   shutdownDrainTimeoutMs?: number;
   mockFetchDelayMs?: number;
 }
@@ -25,6 +31,8 @@ export interface RuntimeConfig {
   host: string;
   port: number;
   logLevel: "DEBUG" | "INFO" | "WARNING" | "ERROR";
+  apiKeyEnabled: boolean;
+  apiKey: string | null;
   browserPoolEnabled: boolean;
   browserPoolSize: number;
   browserHeadless: boolean;
@@ -39,6 +47,10 @@ export interface RuntimeConfig {
   requestQueueConcurrency: number;
   requestQueueMaxSize: number;
   requestQueueTaskTimeoutMs: number;
+  fetchTimeoutDefaultMs: number;
+  fetchTimeoutMinMs: number;
+  fetchTimeoutMaxMs: number;
+  requestBodyMaxBytes: number;
   shutdownDrainTimeoutMs: number;
   mockFetchDelayMs: number;
 }

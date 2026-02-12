@@ -60,8 +60,8 @@ const run = async (): Promise<void> => {
     taskTimeoutMs: runtime.requestQueueTaskTimeoutMs,
   });
   const extractionService = new ExtractionService({
-    defaultTimeoutMs: runtime.requestQueueTaskTimeoutMs,
-    maxTimeoutMs: Math.max(runtime.requestQueueTaskTimeoutMs, 120_000),
+    defaultTimeoutMs: runtime.fetchTimeoutDefaultMs,
+    maxTimeoutMs: runtime.fetchTimeoutMaxMs,
   });
 
   let shuttingDown = false;
@@ -98,6 +98,11 @@ const run = async (): Promise<void> => {
     queueConcurrency: runtime.requestQueueConcurrency,
     queueMaxSize: runtime.requestQueueMaxSize,
     queueTaskTimeoutMs: runtime.requestQueueTaskTimeoutMs,
+    fetchTimeoutDefaultMs: runtime.fetchTimeoutDefaultMs,
+    fetchTimeoutMinMs: runtime.fetchTimeoutMinMs,
+    fetchTimeoutMaxMs: runtime.fetchTimeoutMaxMs,
+    requestBodyMaxBytes: runtime.requestBodyMaxBytes,
+    apiKeyEnabled: runtime.apiKeyEnabled,
     shutdownDrainTimeoutMs: runtime.shutdownDrainTimeoutMs,
     listeningAddress: address?.address ?? runtime.host,
   });

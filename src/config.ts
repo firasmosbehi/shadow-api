@@ -98,6 +98,8 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
   const envPort = process.env.PORT;
   const envLogLevel = process.env.LOG_LEVEL;
   const envRequiredEnvVars = process.env.REQUIRED_ENV_VARS;
+  const envApiKeyEnabled = process.env.API_KEY_ENABLED;
+  const envApiKey = process.env.API_KEY;
   const envBrowserPoolEnabled = process.env.BROWSER_POOL_ENABLED;
   const envBrowserPoolSize = process.env.BROWSER_POOL_SIZE;
   const envBrowserHeadless = process.env.BROWSER_HEADLESS;
@@ -112,6 +114,10 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
   const envRequestQueueConcurrency = process.env.REQUEST_QUEUE_CONCURRENCY;
   const envRequestQueueMaxSize = process.env.REQUEST_QUEUE_MAX_SIZE;
   const envRequestQueueTaskTimeoutMs = process.env.REQUEST_QUEUE_TASK_TIMEOUT_MS;
+  const envFetchTimeoutDefaultMs = process.env.FETCH_TIMEOUT_DEFAULT_MS;
+  const envFetchTimeoutMinMs = process.env.FETCH_TIMEOUT_MIN_MS;
+  const envFetchTimeoutMaxMs = process.env.FETCH_TIMEOUT_MAX_MS;
+  const envRequestBodyMaxBytes = process.env.REQUEST_BODY_MAX_BYTES;
   const envShutdownDrainTimeoutMs = process.env.SHUTDOWN_DRAIN_TIMEOUT_MS;
   const envMockFetchDelayMs = process.env.MOCK_FETCH_DELAY_MS;
 
@@ -139,6 +145,21 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
         `Required env var \`${envName}\` is missing. Set it before starting the actor.`,
       );
     }
+  }
+
+  const apiKeyEnabled = parseBooleanWithValidation(
+    input.apiKeyEnabled ?? envApiKeyEnabled,
+    "apiKeyEnabled",
+    issues,
+    false,
+  );
+
+  const apiKeyRaw = input.apiKey ?? envApiKey;
+  const apiKey = typeof apiKeyRaw === "string" && apiKeyRaw.trim().length > 0 ? apiKeyRaw.trim() : null;
+  if (apiKeyEnabled && !apiKey) {
+    issues.push(
+      "`apiKey` is required when `apiKeyEnabled=true` (input `apiKey` or env `API_KEY`).",
+    );
   }
 
   const browserPoolEnabled = parseBooleanWithValidation(
@@ -255,6 +276,58 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
     600000,
   );
 
+  const fetchTimeoutDefaultMs = parseIntegerWithRangeValidation(
+    input.fetchTimeoutDefaultMs ?? envFetchTimeoutDefaultMs,
+    "fetchTimeoutDefaultMs",
+    issues,
+    8000,
+    1000,
+    600000,
+  );
+
+  const fetchTimeoutMinMs = parseIntegerWithRangeValidation(
+    input.fetchTimeoutMinMs ?? envFetchTimeoutMinMs,
+    "fetchTimeoutMinMs",
+    issues,
+    1000,
+    500,
+    600000,
+  );
+
+  const fetchTimeoutMaxMs = parseIntegerWithRangeValidation(
+    input.fetchTimeoutMaxMs ?? envFetchTimeoutMaxMs,
+    "fetchTimeoutMaxMs",
+    issues,
+    15000,
+    1000,
+    600000,
+  );
+
+  if (fetchTimeoutMinMs > fetchTimeoutMaxMs) {
+    issues.push(
+      "`fetchTimeoutMinMs` must be less than or equal to `fetchTimeoutMaxMs`.",
+    );
+  }
+  if (fetchTimeoutDefaultMs < fetchTimeoutMinMs || fetchTimeoutDefaultMs > fetchTimeoutMaxMs) {
+    issues.push(
+      "`fetchTimeoutDefaultMs` must be within fetch timeout min/max bounds.",
+    );
+  }
+  if (requestQueueTaskTimeoutMs < fetchTimeoutMaxMs) {
+    issues.push(
+      "`requestQueueTaskTimeoutMs` must be greater than or equal to `fetchTimeoutMaxMs`.",
+    );
+  }
+
+  const requestBodyMaxBytes = parseIntegerWithRangeValidation(
+    input.requestBodyMaxBytes ?? envRequestBodyMaxBytes,
+    "requestBodyMaxBytes",
+    issues,
+    1_000_000,
+    1_024,
+    10_000_000,
+  );
+
   const shutdownDrainTimeoutMs = parseIntegerWithRangeValidation(
     input.shutdownDrainTimeoutMs ?? envShutdownDrainTimeoutMs,
     "shutdownDrainTimeoutMs",
@@ -281,6 +354,8 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
     host,
     port: parsedPort,
     logLevel,
+    apiKeyEnabled,
+    apiKey,
     browserPoolEnabled,
     browserPoolSize,
     browserHeadless,
@@ -295,6 +370,10 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
     requestQueueConcurrency,
     requestQueueMaxSize,
     requestQueueTaskTimeoutMs,
+    fetchTimeoutDefaultMs,
+    fetchTimeoutMinMs,
+    fetchTimeoutMaxMs,
+    requestBodyMaxBytes,
     shutdownDrainTimeoutMs,
     mockFetchDelayMs,
   };

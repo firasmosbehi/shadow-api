@@ -77,6 +77,10 @@ The initial Apify Actor scaffold is now in place:
   - `src/extraction/pagination.ts`
   - `src/extraction/challenge-detection.ts`
   - `src/extraction/health-tracker.ts`
+- API contract modules (M4):
+  - `src/api/contracts.ts`
+  - `src/api/envelope.ts`
+  - `src/api/schema-validation.ts`
 - Build/dev config: `package.json`, `tsconfig.json`, `.env.example`, `Dockerfile`
 
 ### Local Quickstart
@@ -114,6 +118,12 @@ Warm pool and standby controls:
 - `REQUEST_QUEUE_CONCURRENCY`
 - `REQUEST_QUEUE_MAX_SIZE`
 - `REQUEST_QUEUE_TASK_TIMEOUT_MS`
+- `FETCH_TIMEOUT_DEFAULT_MS`
+- `FETCH_TIMEOUT_MIN_MS`
+- `FETCH_TIMEOUT_MAX_MS`
+- `REQUEST_BODY_MAX_BYTES`
+- `API_KEY_ENABLED`
+- `API_KEY`
 - `SHUTDOWN_DRAIN_TIMEOUT_MS`
 - `MOCK_FETCH_DELAY_MS`
 
@@ -126,6 +136,8 @@ Session storage uses Apify Key-Value Store and restores browser storage state by
 - `npm run smoke:local` — run lightweight endpoint smoke check against a running service
 - `npm run debug:queue` — fire concurrent fetch calls to observe queue/backpressure behavior
 - `npm run verify:fixtures` — validate adapter extraction outputs against selector fixtures
+- `npm run verify:api-contract` — validate auth + schema + envelope contract behavior
+- `npm run generate:api-artifacts` — generate OpenAPI and Postman artifacts from source
 
 ### M3 Extraction API Notes
 
@@ -136,6 +148,16 @@ Session storage uses Apify Key-Value Store and restores browser storage state by
   - `discord`: `server_metadata`
 - `POST /v1/fetch` accepts `target.mockHtml` (or `target.html`) for deterministic extraction tests.
 
+### M4 API Contract Notes
+
+- Standard response envelope for all endpoints: `ok`, `data`, `error`, `meta`.
+- API key middleware supports `x-api-key` and `Authorization: Bearer`.
+- Public endpoints when auth is enabled: `GET /v1/health`, `GET /v1/ready`.
+- Contract artifacts:
+  - `docs/api/openapi.json`
+  - `docs/api/postman/shadow-api-mvp.postman_collection.json`
+  - `docs/api/error-codes.md`
+
 ## Repository Structure
 
 - `README.md` — project overview and roadmap
@@ -145,5 +167,6 @@ Session storage uses Apify Key-Value Store and restores browser storage state by
 - `CHANGELOG.md` — release history
 - `LICENSE` — project license
 - `docs/product/` — P0 product planning and API contract artifacts
+- `docs/api/` — generated OpenAPI/Postman specs and API troubleshooting docs
 - `.actor/` — Apify Actor metadata and input schema
 - `src/` — Actor runtime source scaffold

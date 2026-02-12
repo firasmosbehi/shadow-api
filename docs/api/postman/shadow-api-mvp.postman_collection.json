@@ -1,0 +1,67 @@
+{
+  "info": {
+    "name": "Shadow API MVP",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "MVP endpoints for Shadow API v0.1.0."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:3000"
+    },
+    {
+      "key": "apiKey",
+      "value": "change-me"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/v1/health"
+      }
+    },
+    {
+      "name": "Ready",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/v1/ready"
+      }
+    },
+    {
+      "name": "Adapters Health",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "x-api-key",
+            "value": "{{apiKey}}"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/adapters/health"
+      }
+    },
+    {
+      "name": "Fetch",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "content-type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-api-key",
+            "value": "{{apiKey}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"source\": \"x\",\n  \"operation\": \"profile\",\n  \"target\": {\n    \"handle\": \"openai\"\n  },\n  \"fields\": [\n    \"display_name\",\n    \"handle\",\n    \"follower_count\"\n  ],\n  \"freshness\": \"hot\",\n  \"timeout_ms\": 8000\n}"
+        },
+        "url": "{{baseUrl}}/v1/fetch"
+      }
+    }
+  ]
+}

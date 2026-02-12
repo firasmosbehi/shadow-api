@@ -1,4 +1,6 @@
 export type AppErrorCode =
+  | "AUTH_REQUIRED"
+  | "AUTH_INVALID"
   | "NOT_FOUND"
   | "VALIDATION_ERROR"
   | "SOURCE_NOT_SUPPORTED"
@@ -43,6 +45,32 @@ export class ValidationError extends AppError {
       details: details ?? null,
     });
     this.name = "ValidationError";
+  }
+}
+
+export class AuthRequiredError extends AppError {
+  public constructor(details?: Record<string, unknown>) {
+    super({
+      code: "AUTH_REQUIRED",
+      message: "API key is required for this endpoint.",
+      statusCode: 401,
+      retryable: false,
+      details: details ?? null,
+    });
+    this.name = "AuthRequiredError";
+  }
+}
+
+export class AuthInvalidError extends AppError {
+  public constructor(details?: Record<string, unknown>) {
+    super({
+      code: "AUTH_INVALID",
+      message: "API key is invalid.",
+      statusCode: 401,
+      retryable: false,
+      details: details ?? null,
+    });
+    this.name = "AuthInvalidError";
   }
 }
 
@@ -184,7 +212,10 @@ export const normalizeError = (error: unknown): AppError => {
   });
 };
 
-export const toErrorBody = (error: unknown) => {
+export const toErrorBody = (
+  error: unknown,
+  metaOverrides: Record<string, unknown> = {},
+) => {
   const appError = normalizeError(error);
   return {
     ok: false,
@@ -196,8 +227,11 @@ export const toErrorBody = (error: unknown) => {
       details: appError.details,
     },
     meta: {
+      request_id:
+        typeof metaOverrides.request_id === "string" ? metaOverrides.request_id : null,
       timestamp: new Date().toISOString(),
       version: "0.1.0",
+      ...metaOverrides,
     },
   };
 };

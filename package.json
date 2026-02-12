@@ -12,7 +12,11 @@
     "dev:runner": "tsx scripts/dev-runner.ts",
     "debug:queue": "tsx scripts/debug-queue.ts",
     "smoke:local": "tsx scripts/smoke-local.ts",
-    "verify:fixtures": "tsx scripts/verify-selector-fixtures.ts"
+    "verify:fixtures": "tsx scripts/verify-selector-fixtures.ts",
+    "verify:api-contract": "tsx scripts/verify-api-contract.ts",
+    "generate:openapi": "tsx scripts/generate-openapi.ts",
+    "generate:postman": "tsx scripts/generate-postman.ts",
+    "generate:api-artifacts": "npm run generate:openapi && npm run generate:postman"
   },
   "keywords": [
     "apify",
@@ -26,6 +30,7 @@
     "node": ">=20"
   },
   "dependencies": {
+    "ajv": "^8.17.1",
     "apify": "^3.5.1",
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.5",
