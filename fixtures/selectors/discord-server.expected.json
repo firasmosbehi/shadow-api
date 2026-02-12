@@ -1,0 +1,14 @@
+{
+  "source": "discord",
+  "operation": "server_metadata",
+  "target": {
+    "inviteCode": "shadow-api"
+  },
+  "expectedData": {
+    "server_name": "Shadow API Builders",
+    "description": "Discuss shadow APIs and scraping resilience.",
+    "invite_code": "shadow-api",
+    "member_count": 15230,
+    "online_count": 1204
+  }
+}

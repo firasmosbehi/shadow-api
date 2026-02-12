@@ -6,6 +6,7 @@ import { BrowserPoolManager } from "./runtime/browser-pool";
 import { AsyncRequestQueue } from "./runtime/request-queue";
 import { SessionStorageManager } from "./runtime/session-storage";
 import { StandbyLifecycleController } from "./runtime/standby-lifecycle";
+import { ExtractionService } from "./extraction/service";
 import type { ActorInput } from "./types";
 
 const closeServer = async (server: ReturnType<typeof createApiServer>): Promise<void> =>
@@ -58,6 +59,10 @@ const run = async (): Promise<void> => {
     maxSize: runtime.requestQueueMaxSize,
     taskTimeoutMs: runtime.requestQueueTaskTimeoutMs,
   });
+  const extractionService = new ExtractionService({
+    defaultTimeoutMs: runtime.requestQueueTaskTimeoutMs,
+    maxTimeoutMs: Math.max(runtime.requestQueueTaskTimeoutMs, 120_000),
+  });
 
   let shuttingDown = false;
 
@@ -67,21 +72,13 @@ const run = async (): Promise<void> => {
     getWarmSessions: () => browserPool.getStatus().warmSessionCount,
     getStandbyMode: () => standby.getStatus().mode,
     getStandbyIdleMs: () => standby.getStatus().idleForMs,
+    getAdapterHealth: () => extractionService.getAdapterHealth(),
     isShuttingDown: () => shuttingDown,
     onActivity: () => standby.onActivity(),
     enqueueFetch: async (request) =>
       requestQueue.enqueue(async () => {
         await sleep(runtime.mockFetchDelayMs);
-        return {
-          source: request.source,
-          operation: request.operation,
-          target: request.target,
-          fields: request.fields ?? [],
-          freshness: request.freshness ?? "hot",
-          timeout_ms: request.timeout_ms ?? runtime.requestQueueTaskTimeoutMs,
-          fetched_at: new Date().toISOString(),
-          mocked: true,
-        };
+        return extractionService.execute(request);
       }),
   });
 

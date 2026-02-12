@@ -68,6 +68,15 @@ The initial Apify Actor scaffold is now in place:
   - `src/runtime/request-queue.ts`
   - `src/runtime/errors.ts`
   - `src/runtime/navigation.ts`
+- Extraction modules (M3):
+  - `src/extraction/types.ts`
+  - `src/extraction/service.ts`
+  - `src/extraction/adapters/`
+  - `src/extraction/normalization.ts`
+  - `src/extraction/selector-fallback.ts`
+  - `src/extraction/pagination.ts`
+  - `src/extraction/challenge-detection.ts`
+  - `src/extraction/health-tracker.ts`
 - Build/dev config: `package.json`, `tsconfig.json`, `.env.example`, `Dockerfile`
 
 ### Local Quickstart
@@ -77,6 +86,7 @@ The initial Apify Actor scaffold is now in place:
 3. Verify endpoints:
    - `GET http://127.0.0.1:3000/v1/health`
    - `GET http://127.0.0.1:3000/v1/ready`
+   - `GET http://127.0.0.1:3000/v1/adapters/health`
    - `POST http://127.0.0.1:3000/v1/fetch`
 
 ### Config Validation
@@ -115,6 +125,16 @@ Session storage uses Apify Key-Value Store and restores browser storage state by
 - `npm run dev:runner` — start local runtime and print health/ready/fetch sample output
 - `npm run smoke:local` — run lightweight endpoint smoke check against a running service
 - `npm run debug:queue` — fire concurrent fetch calls to observe queue/backpressure behavior
+- `npm run verify:fixtures` — validate adapter extraction outputs against selector fixtures
+
+### M3 Extraction API Notes
+
+- Current prototype sources: `linkedin`, `x`, `discord`
+- Supported operations:
+  - `linkedin`: `profile`
+  - `x`: `profile`
+  - `discord`: `server_metadata`
+- `POST /v1/fetch` accepts `target.mockHtml` (or `target.html`) for deterministic extraction tests.
 
 ## Repository Structure
 

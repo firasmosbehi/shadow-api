@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "dev:runner": "tsx scripts/dev-runner.ts",
     "debug:queue": "tsx scripts/debug-queue.ts",
-    "smoke:local": "tsx scripts/smoke-local.ts"
+    "smoke:local": "tsx scripts/smoke-local.ts",
+    "verify:fixtures": "tsx scripts/verify-selector-fixtures.ts"
   },
   "keywords": [
     "apify",
@@ -26,6 +27,7 @@
   },
   "dependencies": {
     "apify": "^3.5.1",
+    "cheerio": "^1.0.0",
     "dotenv": "^16.4.5",
     "playwright-core": "^1.50.1"
   },

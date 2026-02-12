@@ -22,6 +22,16 @@ const waitForEndpoint = async (url: string, timeoutMs: number): Promise<void> =>
 const run = async (): Promise<void> => {
   const port = Number(process.env.PORT ?? 3300);
   const baseUrl = `http://127.0.0.1:${port}`;
+  const mockXHtml = `
+    <html><body>
+      <div data-testid="UserName"><span>OpenAI</span><span>@OpenAI</span></div>
+      <div data-testid="UserDescription">Building safe AGI.</div>
+      <div data-testid="UserLocation">San Francisco, CA</div>
+      <a href="/openai/followers"><span>1.5M Followers</span></a>
+      <a href="/openai/following"><span>42 Following</span></a>
+      <a href="/openai/with_replies"><span>9,876 Posts</span></a>
+    </body></html>
+  `;
   const env = {
     ...process.env,
     PORT: String(port),
@@ -47,8 +57,8 @@ const run = async (): Promise<void> => {
         body: JSON.stringify({
           source: "x",
           operation: "profile",
-          target: { handle: "openai" },
-          fields: ["handle", "name"],
+          target: { handle: "openai", mockHtml: mockXHtml },
+          fields: ["handle", "display_name", "follower_count"],
         }),
       })
     ).json();

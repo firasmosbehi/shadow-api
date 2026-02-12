@@ -1,6 +1,9 @@
 export type AppErrorCode =
   | "NOT_FOUND"
   | "VALIDATION_ERROR"
+  | "SOURCE_NOT_SUPPORTED"
+  | "OPERATION_NOT_SUPPORTED"
+  | "SOURCE_BLOCKED"
   | "QUEUE_BACKPRESSURE"
   | "QUEUE_CLOSED"
   | "QUEUE_TIMEOUT"
@@ -40,6 +43,45 @@ export class ValidationError extends AppError {
       details: details ?? null,
     });
     this.name = "ValidationError";
+  }
+}
+
+export class SourceNotSupportedError extends AppError {
+  public constructor(source: string) {
+    super({
+      code: "SOURCE_NOT_SUPPORTED",
+      message: `Source is not supported: ${source}`,
+      statusCode: 400,
+      retryable: false,
+      details: { source },
+    });
+    this.name = "SourceNotSupportedError";
+  }
+}
+
+export class OperationNotSupportedError extends AppError {
+  public constructor(source: string, operation: string, supportedOperations: string[]) {
+    super({
+      code: "OPERATION_NOT_SUPPORTED",
+      message: `Operation '${operation}' is not supported for source '${source}'.`,
+      statusCode: 400,
+      retryable: false,
+      details: { source, operation, supportedOperations },
+    });
+    this.name = "OperationNotSupportedError";
+  }
+}
+
+export class SourceBlockedError extends AppError {
+  public constructor(message: string, details?: Record<string, unknown>) {
+    super({
+      code: "SOURCE_BLOCKED",
+      message,
+      statusCode: 503,
+      retryable: true,
+      details: details ?? null,
+    });
+    this.name = "SourceBlockedError";
   }
 }
 

@@ -1,0 +1,16 @@
+{
+  "source": "x",
+  "operation": "profile",
+  "target": {
+    "handle": "openai"
+  },
+  "expectedData": {
+    "display_name": "OpenAI",
+    "handle": "openai",
+    "bio": "Building safe AGI.",
+    "location": "San Francisco, CA",
+    "follower_count": 1500000,
+    "following_count": 42,
+    "post_count": 9876
+  }
+}

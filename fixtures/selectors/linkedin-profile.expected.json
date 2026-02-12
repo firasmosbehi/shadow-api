@@ -1,0 +1,14 @@
+{
+  "source": "linkedin",
+  "operation": "profile",
+  "target": {
+    "handle": "ada"
+  },
+  "expectedData": {
+    "full_name": "Ada Lovelace",
+    "headline": "Distributed Systems Architect",
+    "location": "London, United Kingdom",
+    "follower_count": 12400,
+    "handle": "ada"
+  }
+}

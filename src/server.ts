@@ -1,6 +1,7 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
 import type { RuntimeConfig } from "./types";
+import type { FetchRequestInput } from "./extraction/types";
 import {
   NotFoundError,
   ShuttingDownError,
@@ -15,18 +16,10 @@ export interface ServerRuntimeState {
   getWarmSessions: () => number;
   getStandbyMode: () => "disabled" | "active" | "standby";
   getStandbyIdleMs: () => number;
+  getAdapterHealth: () => unknown;
   isShuttingDown: () => boolean;
   onActivity: () => void;
-  enqueueFetch: (request: FetchRequest) => Promise<unknown>;
-}
-
-interface FetchRequest {
-  source: string;
-  operation: string;
-  target: Record<string, unknown>;
-  fields?: string[];
-  freshness?: string;
-  timeout_ms?: number;
+  enqueueFetch: (request: FetchRequestInput) => Promise<unknown>;
 }
 
 const json = (res: ServerResponse, statusCode: number, body: unknown): void => {
@@ -73,7 +66,7 @@ const readJsonBody = async (
   }
 };
 
-const validateFetchRequest = (payload: unknown): FetchRequest => {
+const validateFetchRequest = (payload: unknown): FetchRequestInput => {
   if (!payload || typeof payload !== "object") {
     throw new ValidationError("Fetch request payload must be a JSON object.");
   }
@@ -161,13 +154,29 @@ export const createApiServer = (runtime: RuntimeConfig, state: ServerRuntimeStat
       return;
     }
 
-    if (method === "GET" && path === "/v1/debug/queue") {
-      json(res, 200, {
-        ok: true,
-        data: {
+  if (method === "GET" && path === "/v1/debug/queue") {
+    json(res, 200, {
+      ok: true,
+      data: {
           queue_depth: state.getQueueDepth(),
           queue_inflight: state.getQueueInflight(),
           shutting_down: state.isShuttingDown(),
+        },
+        error: null,
+        meta: {
+          request_id: requestId,
+          timestamp: new Date().toISOString(),
+          version: "0.1.0",
+        },
+      });
+      return;
+    }
+
+    if (method === "GET" && path === "/v1/adapters/health") {
+      json(res, 200, {
+        ok: true,
+        data: {
+          adapters: state.getAdapterHealth(),
         },
         error: null,
         meta: {
