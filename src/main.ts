@@ -2,6 +2,8 @@ import { Actor, log } from "apify";
 import type { AddressInfo } from "node:net";
 import { buildRuntimeConfig, ConfigValidationError } from "./config";
 import { createApiServer } from "./server";
+import { BrowserPoolManager } from "./runtime/browser-pool";
+import { StandbyLifecycleController } from "./runtime/standby-lifecycle";
 import type { ActorInput } from "./types";
 
 const closeServer = async (server: ReturnType<typeof createApiServer>): Promise<void> =>
@@ -19,7 +21,30 @@ const run = async (): Promise<void> => {
   const runtime = buildRuntimeConfig(input);
 
   log.setLevel(log.LEVELS[runtime.logLevel]);
-  const server = createApiServer(runtime);
+  const browserPool = new BrowserPoolManager({
+    enabled: runtime.browserPoolEnabled,
+    size: runtime.browserPoolSize,
+    headless: runtime.browserHeadless,
+    launchTimeoutMs: runtime.browserLaunchTimeoutMs,
+  });
+
+  const standby = new StandbyLifecycleController(browserPool, {
+    enabled: runtime.standbyEnabled,
+    idleTimeoutMs: runtime.standbyIdleTimeoutMs,
+    tickIntervalMs: runtime.standbyTickIntervalMs,
+    recycleAfterMs: runtime.standbyRecycleAfterMs,
+    minWarmSessions: runtime.browserPoolSize,
+  });
+
+  await standby.start();
+
+  const server = createApiServer(runtime, {
+    getQueueDepth: () => 0,
+    getWarmSessions: () => browserPool.getStatus().warmSessionCount,
+    getStandbyMode: () => standby.getStatus().mode,
+    getStandbyIdleMs: () => standby.getStatus().idleForMs,
+    onActivity: () => standby.onActivity(),
+  });
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -31,18 +56,22 @@ const run = async (): Promise<void> => {
     host: runtime.host,
     port: runtime.port,
     logLevel: runtime.logLevel,
+    browserPoolEnabled: runtime.browserPoolEnabled,
+    standbyEnabled: runtime.standbyEnabled,
     listeningAddress: address?.address ?? runtime.host,
   });
 
   Actor.on("aborting", async () => {
     log.warning("Actor abort signal received. Closing HTTP server.");
     await closeServer(server);
+    await standby.stop();
     await Actor.exit();
   });
 
   Actor.on("migrating", async () => {
     log.warning("Actor migrating. Closing HTTP server.");
     await closeServer(server);
+    await standby.stop();
   });
 };
 

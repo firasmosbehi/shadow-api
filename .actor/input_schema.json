@@ -33,6 +33,54 @@
       "description": "Environment variable names that must be present at startup.",
       "editor": "stringList",
       "prefill": []
+    },
+    "browserPoolEnabled": {
+      "title": "Browser pool enabled",
+      "type": "boolean",
+      "description": "Enable Playwright warm browser pool.",
+      "default": true
+    },
+    "browserPoolSize": {
+      "title": "Browser pool size",
+      "type": "integer",
+      "description": "Number of warm sessions to keep.",
+      "default": 1
+    },
+    "browserHeadless": {
+      "title": "Browser headless",
+      "type": "boolean",
+      "description": "Run browser in headless mode.",
+      "default": true
+    },
+    "browserLaunchTimeoutMs": {
+      "title": "Browser launch timeout (ms)",
+      "type": "integer",
+      "description": "Playwright browser launch timeout in milliseconds.",
+      "default": 30000
+    },
+    "standbyEnabled": {
+      "title": "Standby lifecycle enabled",
+      "type": "boolean",
+      "description": "Enable standby lifecycle manager for warm sessions.",
+      "default": true
+    },
+    "standbyIdleTimeoutMs": {
+      "title": "Standby idle timeout (ms)",
+      "type": "integer",
+      "description": "Switch to standby mode after this idle duration.",
+      "default": 60000
+    },
+    "standbyTickIntervalMs": {
+      "title": "Standby tick interval (ms)",
+      "type": "integer",
+      "description": "Lifecycle loop interval in milliseconds.",
+      "default": 10000
+    },
+    "standbyRecycleAfterMs": {
+      "title": "Session recycle age (ms)",
+      "type": "integer",
+      "description": "Recycle warm sessions older than this age.",
+      "default": 900000
     }
   }
 }

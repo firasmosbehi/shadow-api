@@ -62,6 +62,7 @@ The initial Apify Actor scaffold is now in place:
 
 - Actor config: `.actor/actor.json`, `.actor/input_schema.json`
 - Runtime source: `src/main.ts`, `src/config.ts`, `src/server.ts`
+- Warm runtime managers: `src/runtime/browser-pool.ts`, `src/runtime/standby-lifecycle.ts`
 - Build/dev config: `package.json`, `tsconfig.json`, `.env.example`, `Dockerfile`
 
 ### Local Quickstart
@@ -80,6 +81,19 @@ Startup now validates runtime config and fails fast with explicit errors when:
 - `HOST`/`host` is empty
 - `LOG_LEVEL`/`logLevel` is not one of `DEBUG|INFO|WARNING|ERROR`
 - any variable listed in `REQUIRED_ENV_VARS` (or actor input `requiredEnvVars`) is missing
+
+Warm pool and standby controls:
+
+- `BROWSER_POOL_ENABLED` (`true|false`)
+- `BROWSER_POOL_SIZE` (warm session count)
+- `BROWSER_HEADLESS` (`true|false`)
+- `BROWSER_LAUNCH_TIMEOUT_MS`
+- `STANDBY_ENABLED` (`true|false`)
+- `STANDBY_IDLE_TIMEOUT_MS`
+- `STANDBY_TICK_INTERVAL_MS`
+- `STANDBY_RECYCLE_AFTER_MS`
+
+Note: when browser pool is enabled, a Playwright-compatible browser must be available in runtime.
 
 ## Repository Structure
 

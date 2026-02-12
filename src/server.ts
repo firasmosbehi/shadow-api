@@ -1,6 +1,14 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import type { RuntimeConfig } from "./types";
 
+export interface ServerRuntimeState {
+  getQueueDepth: () => number;
+  getWarmSessions: () => number;
+  getStandbyMode: () => "disabled" | "active" | "standby";
+  getStandbyIdleMs: () => number;
+  onActivity: () => void;
+}
+
 const json = (res: ServerResponse, statusCode: number, body: unknown): void => {
   res.statusCode = statusCode;
   res.setHeader("content-type", "application/json; charset=utf-8");
@@ -24,7 +32,7 @@ const notFound = (req: IncomingMessage, res: ServerResponse): void => {
   });
 };
 
-export const createApiServer = (runtime: RuntimeConfig): Server => {
+export const createApiServer = (runtime: RuntimeConfig, state: ServerRuntimeState): Server => {
   const startedAt = new Date();
 
   return createServer((req, res) => {
@@ -52,8 +60,10 @@ export const createApiServer = (runtime: RuntimeConfig): Server => {
         ok: true,
         data: {
           ready: true,
-          queue_depth: 0,
-          warm_sessions: 0,
+          queue_depth: state.getQueueDepth(),
+          warm_sessions: state.getWarmSessions(),
+          standby_mode: state.getStandbyMode(),
+          standby_idle_ms: state.getStandbyIdleMs(),
           host: runtime.host,
           port: runtime.port,
         },
@@ -66,6 +76,7 @@ export const createApiServer = (runtime: RuntimeConfig): Server => {
       return;
     }
 
+    state.onActivity();
     notFound(req, res);
   });
 };

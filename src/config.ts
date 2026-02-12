@@ -4,6 +4,8 @@ import type { ActorInput, RuntimeConfig } from "./types";
 loadDotEnv();
 
 const ALLOWED_LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR"] as const;
+const TRUE_VALUES = new Set(["1", "true", "yes", "y", "on"]);
+const FALSE_VALUES = new Set(["0", "false", "no", "n", "off"]);
 
 export class ConfigValidationError extends Error {
   public readonly issues: string[];
@@ -29,6 +31,51 @@ const parseRequiredEnvVars = (
   return [...new Set(envList.split(",").map((entry) => entry.trim()).filter(Boolean))];
 };
 
+const parseBooleanWithValidation = (
+  value: boolean | string | undefined,
+  fieldName: string,
+  issues: string[],
+  fallback: boolean,
+): boolean => {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return fallback;
+
+  const normalized = value.trim().toLowerCase();
+  if (TRUE_VALUES.has(normalized)) return true;
+  if (FALSE_VALUES.has(normalized)) return false;
+
+  issues.push(
+    `\`${fieldName}\` must be a boolean (true/false, 1/0, yes/no). Received: ${JSON.stringify(value)}.`,
+  );
+  return fallback;
+};
+
+const parseIntegerWithRangeValidation = (
+  value: number | string | undefined,
+  fieldName: string,
+  issues: string[],
+  fallback: number,
+  min: number,
+  max: number,
+): number => {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number(value)
+        : fallback;
+
+  if (!Number.isInteger(parsed)) {
+    issues.push(`\`${fieldName}\` must be an integer. Received: ${JSON.stringify(value)}.`);
+    return fallback;
+  }
+  if (parsed < min || parsed > max) {
+    issues.push(`\`${fieldName}\` must be within ${min}-${max}. Received: ${parsed}.`);
+    return fallback;
+  }
+  return parsed;
+};
+
 export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
   const issues: string[] = [];
 
@@ -36,6 +83,14 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
   const envPort = process.env.PORT;
   const envLogLevel = process.env.LOG_LEVEL;
   const envRequiredEnvVars = process.env.REQUIRED_ENV_VARS;
+  const envBrowserPoolEnabled = process.env.BROWSER_POOL_ENABLED;
+  const envBrowserPoolSize = process.env.BROWSER_POOL_SIZE;
+  const envBrowserHeadless = process.env.BROWSER_HEADLESS;
+  const envBrowserLaunchTimeoutMs = process.env.BROWSER_LAUNCH_TIMEOUT_MS;
+  const envStandbyEnabled = process.env.STANDBY_ENABLED;
+  const envStandbyIdleTimeoutMs = process.env.STANDBY_IDLE_TIMEOUT_MS;
+  const envStandbyTickIntervalMs = process.env.STANDBY_TICK_INTERVAL_MS;
+  const envStandbyRecycleAfterMs = process.env.STANDBY_RECYCLE_AFTER_MS;
 
   const rawHost = input.host ?? envHost ?? "0.0.0.0";
   const host = typeof rawHost === "string" ? rawHost.trim() : "";
@@ -43,23 +98,8 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
     issues.push("`host` must be a non-empty string (input `host` or env `HOST`).");
   }
 
-  const rawPort = input.port ?? envPort ?? 3000;
-  const parsedPort =
-    typeof rawPort === "number"
-      ? rawPort
-      : typeof rawPort === "string"
-        ? Number(rawPort)
-        : Number.NaN;
-
-  if (!Number.isInteger(parsedPort)) {
-    issues.push(
-      `\`port\` must be an integer. Received: ${JSON.stringify(rawPort)} (input \`port\` or env \`PORT\`).`,
-    );
-  } else if (parsedPort < 1 || parsedPort > 65535) {
-    issues.push(
-      `\`port\` must be within 1-65535. Received: ${parsedPort} (input \`port\` or env \`PORT\`).`,
-    );
-  }
+  const rawPort = input.port ?? envPort;
+  const parsedPort = parseIntegerWithRangeValidation(rawPort, "port", issues, 3000, 1, 65535);
 
   const rawLogLevel = input.logLevel ?? envLogLevel ?? "INFO";
   const logLevel = String(rawLogLevel).toUpperCase() as RuntimeConfig["logLevel"];
@@ -78,6 +118,72 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
     }
   }
 
+  const browserPoolEnabled = parseBooleanWithValidation(
+    input.browserPoolEnabled ?? envBrowserPoolEnabled,
+    "browserPoolEnabled",
+    issues,
+    true,
+  );
+
+  const browserPoolSize = parseIntegerWithRangeValidation(
+    input.browserPoolSize ?? envBrowserPoolSize,
+    "browserPoolSize",
+    issues,
+    1,
+    0,
+    20,
+  );
+
+  const browserHeadless = parseBooleanWithValidation(
+    input.browserHeadless ?? envBrowserHeadless,
+    "browserHeadless",
+    issues,
+    true,
+  );
+
+  const browserLaunchTimeoutMs = parseIntegerWithRangeValidation(
+    input.browserLaunchTimeoutMs ?? envBrowserLaunchTimeoutMs,
+    "browserLaunchTimeoutMs",
+    issues,
+    30000,
+    1000,
+    120000,
+  );
+
+  const standbyEnabled = parseBooleanWithValidation(
+    input.standbyEnabled ?? envStandbyEnabled,
+    "standbyEnabled",
+    issues,
+    true,
+  );
+
+  const standbyIdleTimeoutMs = parseIntegerWithRangeValidation(
+    input.standbyIdleTimeoutMs ?? envStandbyIdleTimeoutMs,
+    "standbyIdleTimeoutMs",
+    issues,
+    60000,
+    1000,
+    3600000,
+  );
+
+  const standbyTickIntervalMs = parseIntegerWithRangeValidation(
+    input.standbyTickIntervalMs ?? envStandbyTickIntervalMs,
+    "standbyTickIntervalMs",
+    issues,
+    10000,
+    1000,
+    300000,
+  );
+
+  const standbyRecycleAfterMs = parseIntegerWithRangeValidation(
+    input.standbyRecycleAfterMs ?? envStandbyRecycleAfterMs,
+    "standbyRecycleAfterMs",
+    issues,
+    900000,
+    1000,
+    7200000,
+  );
+
   if (issues.length > 0) {
     throw new ConfigValidationError(issues);
   }
@@ -86,5 +192,13 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
     host,
     port: parsedPort,
     logLevel,
+    browserPoolEnabled,
+    browserPoolSize,
+    browserHeadless,
+    browserLaunchTimeoutMs,
+    standbyEnabled,
+    standbyIdleTimeoutMs,
+    standbyTickIntervalMs,
+    standbyRecycleAfterMs,
   };
 };
