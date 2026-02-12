@@ -1,6 +1,6 @@
 import { Actor, log } from "apify";
 import type { AddressInfo } from "node:net";
-import { buildRuntimeConfig } from "./config";
+import { buildRuntimeConfig, ConfigValidationError } from "./config";
 import { createApiServer } from "./server";
 import type { ActorInput } from "./types";
 
@@ -47,6 +47,14 @@ const run = async (): Promise<void> => {
 };
 
 run().catch(async (error) => {
+  if (error instanceof ConfigValidationError) {
+    log.error("Actor bootstrap failed due to invalid configuration.", {
+      issues: error.issues,
+    });
+    await Actor.fail(error.message);
+    return;
+  }
+
   log.exception(error as Error, "Actor bootstrap failed");
   await Actor.fail((error as Error).message);
 });

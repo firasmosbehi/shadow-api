@@ -72,6 +72,15 @@ The initial Apify Actor scaffold is now in place:
    - `GET http://127.0.0.1:3000/v1/health`
    - `GET http://127.0.0.1:3000/v1/ready`
 
+### Config Validation
+
+Startup now validates runtime config and fails fast with explicit errors when:
+
+- `PORT`/`port` is non-integer or outside `1..65535`
+- `HOST`/`host` is empty
+- `LOG_LEVEL`/`logLevel` is not one of `DEBUG|INFO|WARNING|ERROR`
+- any variable listed in `REQUIRED_ENV_VARS` (or actor input `requiredEnvVars`) is missing
+
 ## Repository Structure
 
 - `README.md` — project overview and roadmap

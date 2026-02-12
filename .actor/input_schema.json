@@ -26,6 +26,13 @@
         "WARNING",
         "ERROR"
       ]
+    },
+    "requiredEnvVars": {
+      "title": "Required env vars",
+      "type": "array",
+      "description": "Environment variable names that must be present at startup.",
+      "editor": "stringList",
+      "prefill": []
     }
   }
 }
