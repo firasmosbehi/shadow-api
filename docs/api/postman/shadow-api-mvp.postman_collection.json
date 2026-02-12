@@ -56,6 +56,58 @@
       }
     },
     {
+      "name": "Debug Reliability",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "x-api-key",
+            "value": "{{apiKey}}"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/debug/reliability"
+      }
+    },
+    {
+      "name": "Metrics",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "x-api-key",
+            "value": "{{apiKey}}"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/metrics"
+      }
+    },
+    {
+      "name": "Admin Diagnostics",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "x-api-key",
+            "value": "{{apiKey}}"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/admin/diagnostics"
+      }
+    },
+    {
+      "name": "Admin Purge",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "x-api-key",
+            "value": "{{apiKey}}"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/admin/purge"
+      }
+    },
+    {
       "name": "Fetch",
       "request": {
         "method": "POST",

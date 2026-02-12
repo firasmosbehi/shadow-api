@@ -115,6 +115,81 @@ const document = {
         },
       },
     },
+    "/v1/debug/reliability": {
+      get: {
+        tags: ["Operations"],
+        summary: "Reliability snapshot (circuits, proxies, quarantine, DLQ, incidents)",
+        security: [{ ApiKeyHeader: [] }, { BearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "Reliability snapshot response",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+              },
+            },
+          },
+          default: {
+            description: "Error response",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorEnvelope" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/v1/metrics": {
+      get: {
+        tags: ["Operations"],
+        summary: "Prometheus metrics exposition",
+        security: [{ ApiKeyHeader: [] }, { BearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "Prometheus text exposition",
+            content: {
+              "text/plain": {
+                schema: { type: "string" },
+              },
+            },
+          },
+          default: {
+            description: "Error response",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorEnvelope" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/v1/admin/diagnostics": {
+      get: {
+        tags: ["Operations"],
+        summary: "Runtime diagnostics snapshot (admin)",
+        security: [{ ApiKeyHeader: [] }, { BearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "Diagnostics response",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+              },
+            },
+          },
+          default: {
+            description: "Error response",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorEnvelope" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/v1/fetch": {
       post: {
         tags: ["Extraction"],
@@ -166,6 +241,39 @@ const document = {
           },
           "503": {
             description: "Source blocked / service shutting down",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorEnvelope" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/v1/admin/purge": {
+      post: {
+        tags: ["Operations"],
+        summary: "Purge cache/session/DLQ state (admin)",
+        security: [{ ApiKeyHeader: [] }, { BearerAuth: [] }],
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: { type: "object" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Purge succeeded",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+              },
+            },
+          },
+          default: {
+            description: "Error response",
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/ErrorEnvelope" },

@@ -12,6 +12,7 @@ import { createCacheProvider } from "./performance/cache-provider";
 import { FetchPipeline } from "./performance/fetch-pipeline";
 import { PrewarmScheduler } from "./performance/prewarm-scheduler";
 import { ResponseCache } from "./performance/response-cache";
+import { installCorrelationLogging } from "./observability/correlation-log";
 import { installLogRedaction } from "./security/secure-log";
 import { CheckpointStore } from "./reliability/checkpoint-store";
 import { CircuitBreakerRegistry } from "./reliability/circuit-breaker";
@@ -74,6 +75,7 @@ const run = async (): Promise<void> => {
 
   log.setLevel(log.LEVELS[runtime.logLevel]);
   installLogRedaction(log as unknown as Record<string, unknown>, runtime.logRedactionEnabled);
+  installCorrelationLogging(log as unknown as Record<string, unknown>, true);
   const sessionStorage = new SessionStorageManager({
     enabled: runtime.sessionStorageEnabled,
     storeName: runtime.sessionStoreName,

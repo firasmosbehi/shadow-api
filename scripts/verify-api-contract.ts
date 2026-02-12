@@ -136,6 +136,16 @@ const run = async (): Promise<void> => {
     assert(debugPerformanceResponse.status === 200, "debug performance should return 200");
     assert(debugPerformance.ok === true, "debug performance envelope ok should be true");
 
+    const metricsResponse = await fetch(`${baseUrl}/v1/metrics`, {
+      headers: { "x-api-key": apiKey },
+    });
+    const metricsText = await metricsResponse.text();
+    assert(metricsResponse.status === 200, "metrics should return 200");
+    assert(
+      metricsText.includes("shadow_api_http_requests_total"),
+      "metrics exposition should include shadow_api_http_requests_total",
+    );
+
     // eslint-disable-next-line no-console
     console.log(
       JSON.stringify(
@@ -146,6 +156,7 @@ const run = async (): Promise<void> => {
           okFetchStatus: okFetchResponse.status,
           adaptersHealthStatus: adaptersHealthResponse.status,
           debugPerformanceStatus: debugPerformanceResponse.status,
+          metricsStatus: metricsResponse.status,
         },
         null,
         2,

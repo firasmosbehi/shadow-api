@@ -163,6 +163,25 @@ const run = async (): Promise<void> => {
     assert(purgeResp.status === 200, "purge endpoint should return 200");
     assert(purged.ok === true, "purge response ok should be true");
 
+    const diagTs = Math.floor(Date.now() / 1000);
+    const diagSig = sign({
+      secret: hmacSecret,
+      method: "GET",
+      pathWithQuery: "/v1/admin/diagnostics",
+      rawBody: "",
+      timestampSec: diagTs,
+    });
+    const diagResp = await fetch(`${baseUrl}/v1/admin/diagnostics`, {
+      headers: {
+        "x-api-key": apiKey,
+        [signatureHeader]: diagSig.signature,
+        [timestampHeader]: diagSig.timestamp,
+      },
+    });
+    const diag = await diagResp.json();
+    assert(diagResp.status === 200, "diagnostics endpoint should return 200");
+    assert(diag.ok === true, "diagnostics response ok should be true");
+
     // Rate limit test: burst requests should eventually 429.
     const getTs = Math.floor(Date.now() / 1000);
     const getSig = sign({
@@ -225,4 +244,3 @@ run().catch((error) => {
   console.error(error);
   process.exit(1);
 });
-

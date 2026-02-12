@@ -1,0 +1,62 @@
+groups:
+  - name: shadow-api
+    rules:
+      - alert: ShadowApiHighErrorRate
+        expr: |
+          (
+            sum(rate(shadow_api_http_errors_total[5m]))
+            /
+            sum(rate(shadow_api_http_requests_total[5m]))
+          ) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Shadow API high error rate"
+          description: "HTTP error rate > 5% for 10 minutes."
+          runbook_url: "https://github.com/firasmosbehi/shadow-api/blob/main/docs/reliability/incident-playbook.md"
+
+      - alert: ShadowApiFetchLatencyP95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(shadow_api_http_request_duration_ms_bucket{path=\"/v1/fetch\"}[5m])) by (le)
+          ) > 2000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Shadow API p95 latency breach"
+          description: "p95 /v1/fetch request duration > 2000ms for 10 minutes."
+          runbook_url: "https://github.com/firasmosbehi/shadow-api/blob/main/docs/reliability/incident-playbook.md"
+
+      - alert: ShadowApiCircuitsOpen
+        expr: shadow_api_circuits_open > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Shadow API circuit breakers open"
+          description: "One or more source circuits are open."
+          runbook_url: "https://github.com/firasmosbehi/shadow-api/blob/main/docs/reliability/incident-playbook.md"
+
+      - alert: ShadowApiDeadLettersHigh
+        expr: shadow_api_dead_letters_total > 100
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Shadow API dead-letter queue growing"
+          description: "Dead-letter total > 100 for 15 minutes."
+          runbook_url: "https://github.com/firasmosbehi/shadow-api/blob/main/docs/reliability/incident-playbook.md"
+
+      - alert: ShadowApiQueueDepthHigh
+        expr: shadow_api_queue_depth > 50
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Shadow API queue depth high"
+          description: "Queue depth > 50 for 10 minutes."
+          runbook_url: "https://github.com/firasmosbehi/shadow-api/blob/main/docs/reliability/incident-playbook.md"
+

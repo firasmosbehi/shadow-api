@@ -6,7 +6,11 @@ M4 delivers a stable REST contract for MVP endpoints with standardized envelope 
 - `GET /v1/ready`
 - `GET /v1/adapters/health`
 - `GET /v1/debug/performance`
+- `GET /v1/debug/reliability`
+- `GET /v1/metrics`
 - `POST /v1/fetch`
+- `GET /v1/admin/diagnostics`
+- `POST /v1/admin/purge`
 
 ## Authentication
 

@@ -39,9 +39,33 @@ export const MVP_ENDPOINTS: EndpointContract[] = [
     requiresApiKey: true,
   },
   {
+    method: "GET",
+    path: "/v1/debug/reliability",
+    summary: "Reliability snapshot (circuits, quarantine, DLQ, incidents)",
+    requiresApiKey: true,
+  },
+  {
+    method: "GET",
+    path: "/v1/metrics",
+    summary: "Prometheus metrics exposition",
+    requiresApiKey: true,
+  },
+  {
     method: "POST",
     path: "/v1/fetch",
     summary: "Extract normalized data from supported sources",
+    requiresApiKey: true,
+  },
+  {
+    method: "GET",
+    path: "/v1/admin/diagnostics",
+    summary: "Runtime diagnostics snapshot (admin)",
+    requiresApiKey: true,
+  },
+  {
+    method: "POST",
+    path: "/v1/admin/purge",
+    summary: "Purge cache/session/DLQ state (admin)",
     requiresApiKey: true,
   },
 ];
