@@ -1,0 +1,31 @@
+{
+  "title": "Shadow API Actor Input",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "host": {
+      "title": "Host",
+      "type": "string",
+      "description": "HTTP bind host.",
+      "default": "0.0.0.0"
+    },
+    "port": {
+      "title": "Port",
+      "type": "integer",
+      "description": "HTTP bind port.",
+      "default": 3000
+    },
+    "logLevel": {
+      "title": "Log level",
+      "type": "string",
+      "description": "Application log level.",
+      "default": "INFO",
+      "enum": [
+        "DEBUG",
+        "INFO",
+        "WARNING",
+        "ERROR"
+      ]
+    }
+  }
+}

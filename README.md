@@ -37,9 +37,40 @@ Many high-value platforms (B2B marketplaces, regional portals, and private dashb
 4. Add anti-blocking and extraction fallbacks
 5. Publish to Apify Store with pricing tiers
 
+## P0 Planning Artifacts
+
+Initial P0 product artifacts are documented in `docs/product/`:
+
+- `docs/product/icp-and-verticals.md`
+- `docs/product/demand-scorecard.md`
+- `docs/product/legal-risk-matrix.md`
+- `docs/product/mvp-endpoint-catalog.md`
+- `docs/product/response-schema-conventions.md`
+- `docs/product/slos-and-reliability-baseline.md`
+- `docs/product/pricing-hypotheses.md`
+- `docs/product/north-star-metrics-events.md`
+- `docs/product/demo-use-cases.md`
+- `docs/product/prd-v1.md`
+
 ## Legal and Compliance
 
 This project must be used in compliance with each target site's terms of service, local laws, and privacy requirements.
+
+## Runtime Scaffold (P0-11)
+
+The initial Apify Actor scaffold is now in place:
+
+- Actor config: `.actor/actor.json`, `.actor/input_schema.json`
+- Runtime source: `src/main.ts`, `src/config.ts`, `src/server.ts`
+- Build/dev config: `package.json`, `tsconfig.json`, `.env.example`, `Dockerfile`
+
+### Local Quickstart
+
+1. Install dependencies: `npm install`
+2. Start in dev mode: `npm run dev`
+3. Verify endpoints:
+   - `GET http://127.0.0.1:3000/v1/health`
+   - `GET http://127.0.0.1:3000/v1/ready`
 
 ## Repository Structure
 
@@ -49,3 +80,6 @@ This project must be used in compliance with each target site's terms of service
 - `SECURITY.md` — vulnerability reporting policy
 - `CHANGELOG.md` — release history
 - `LICENSE` — project license
+- `docs/product/` — P0 product planning and API contract artifacts
+- `.actor/` — Apify Actor metadata and input schema
+- `src/` — Actor runtime source scaffold
