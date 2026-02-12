@@ -24,11 +24,14 @@ All error responses follow:
 |---|---:|---|---|---|
 | `AUTH_REQUIRED` | 401 | Missing API key | Protected endpoint called without auth header | Send `x-api-key` or `Authorization: Bearer` |
 | `AUTH_INVALID` | 401 | API key mismatch | Wrong key value | Verify `API_KEY` and client secret |
+| `SIGNATURE_REQUIRED` | 401 | Missing HMAC signature | HMAC signing is enabled but signature headers not provided | Send `x-shadow-signature` and `x-shadow-timestamp` |
+| `SIGNATURE_INVALID` | 401 | Invalid HMAC signature | Bad secret, wrong canonical string, or timestamp window violation | Recompute signature and check clock skew |
 | `VALIDATION_ERROR` | 400 | Request payload is invalid | Missing required fields, wrong types, timeout out of range | Validate request against OpenAPI/JSON schema |
 | `SOURCE_NOT_SUPPORTED` | 400 | Unsupported source | `source` is not one of supported adapters | Use `linkedin`, `x`, or `discord` |
 | `OPERATION_NOT_SUPPORTED` | 400 | Unsupported operation for source | Wrong `operation` for adapter | Use adapter-specific operation (`profile`, `server_metadata`) |
 | `NOT_FOUND` | 404 | Unknown route | Typo or unsupported endpoint path | Use documented `/v1/*` endpoints |
 | `QUEUE_BACKPRESSURE` | 429 | Queue is full | Burst traffic exceeded queue capacity | Retry with backoff |
+| `RATE_LIMITED` | 429 | Client rate limit | Client exceeded configured per-window limits | Retry after `Retry-After` and reduce request rate |
 | `QUEUE_TIMEOUT` | 504 | Request exceeded queue timeout | Timeout settings too low for work size | Increase queue/task timeout and optimize target workload |
 | `QUEUE_CLOSED` | 503 | Queue paused/closed | Service shutting down or maintenance mode | Retry after service recovery |
 | `SOURCE_BLOCKED` | 503 | Upstream challenge detected | Captcha/rate-limit/login wall encountered | Retry later, rotate strategy, reduce request rate |

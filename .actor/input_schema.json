@@ -27,6 +27,12 @@
         "ERROR"
       ]
     },
+    "logRedactionEnabled": {
+      "title": "Log redaction enabled",
+      "type": "boolean",
+      "description": "Redact secrets/PII-like fields from operational logs.",
+      "default": true
+    },
     "requiredEnvVars": {
       "title": "Required env vars",
       "type": "array",
@@ -46,6 +52,68 @@
       "description": "Expected API key value for `x-api-key` or Bearer auth.",
       "default": "",
       "isSecret": true
+    },
+    "hmacSigningEnabled": {
+      "title": "HMAC signing enabled",
+      "type": "boolean",
+      "description": "Require request signatures on protected endpoints.",
+      "default": false
+    },
+    "hmacSecrets": {
+      "title": "HMAC secrets",
+      "type": "array",
+      "description": "List of shared secrets used to validate request signatures (supports rotation).",
+      "editor": "stringList",
+      "prefill": [],
+      "isSecret": true
+    },
+    "hmacMaxSkewSec": {
+      "title": "HMAC max skew (sec)",
+      "type": "integer",
+      "description": "Allowed client/server clock skew window in seconds.",
+      "default": 300
+    },
+    "hmacSignatureHeader": {
+      "title": "HMAC signature header",
+      "type": "string",
+      "description": "Header name used for request signature.",
+      "default": "x-shadow-signature"
+    },
+    "hmacTimestampHeader": {
+      "title": "HMAC timestamp header",
+      "type": "string",
+      "description": "Header name used for request timestamp (unix seconds).",
+      "default": "x-shadow-timestamp"
+    },
+    "rateLimitEnabled": {
+      "title": "Rate limiting enabled",
+      "type": "boolean",
+      "description": "Enable in-memory rate limiting by global/ip/api-key buckets.",
+      "default": false
+    },
+    "rateLimitWindowMs": {
+      "title": "Rate limit window (ms)",
+      "type": "integer",
+      "description": "Window size used for fixed-window counters.",
+      "default": 10000
+    },
+    "rateLimitGlobalMax": {
+      "title": "Rate limit global max",
+      "type": "integer",
+      "description": "Max requests per window across the whole service.",
+      "default": 250
+    },
+    "rateLimitIpMax": {
+      "title": "Rate limit IP max",
+      "type": "integer",
+      "description": "Max requests per window per client IP.",
+      "default": 150
+    },
+    "rateLimitApiKeyMax": {
+      "title": "Rate limit API key max",
+      "type": "integer",
+      "description": "Max requests per window per API key (when provided).",
+      "default": 250
     },
     "browserPoolEnabled": {
       "title": "Browser pool enabled",
@@ -124,6 +192,12 @@
       "type": "string",
       "description": "Prefix for persisted session slot keys.",
       "default": "session-slot"
+    },
+    "sessionStorageRetentionMs": {
+      "title": "Session storage retention (ms)",
+      "type": "integer",
+      "description": "Expire persisted session slots older than this age (0 disables expiry).",
+      "default": 604800000
     },
     "requestQueueConcurrency": {
       "title": "Request queue concurrency",
@@ -356,6 +430,12 @@
       "type": "integer",
       "description": "Maximum retained dead-letter entries.",
       "default": 1000
+    },
+    "deadLetterRetentionMs": {
+      "title": "Dead-letter retention (ms)",
+      "type": "integer",
+      "description": "Expire dead-letter entries older than this age (0 disables expiry).",
+      "default": 2592000000
     },
     "incidentBlockedSpikeThreshold": {
       "title": "Incident blocked spike threshold",

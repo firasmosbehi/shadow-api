@@ -12,6 +12,7 @@ import { createCacheProvider } from "./performance/cache-provider";
 import { FetchPipeline } from "./performance/fetch-pipeline";
 import { PrewarmScheduler } from "./performance/prewarm-scheduler";
 import { ResponseCache } from "./performance/response-cache";
+import { installLogRedaction } from "./security/secure-log";
 import { CheckpointStore } from "./reliability/checkpoint-store";
 import { CircuitBreakerRegistry } from "./reliability/circuit-breaker";
 import { DeadLetterQueue } from "./reliability/dead-letter-queue";
@@ -72,10 +73,12 @@ const run = async (): Promise<void> => {
   const runtime = buildRuntimeConfig(input);
 
   log.setLevel(log.LEVELS[runtime.logLevel]);
+  installLogRedaction(log as unknown as Record<string, unknown>, runtime.logRedactionEnabled);
   const sessionStorage = new SessionStorageManager({
     enabled: runtime.sessionStorageEnabled,
     storeName: runtime.sessionStoreName,
     keyPrefix: runtime.sessionStoreKeyPrefix,
+    retentionMs: runtime.sessionStorageRetentionMs,
   });
   await sessionStorage.init();
 
@@ -128,6 +131,7 @@ const run = async (): Promise<void> => {
     enabled: runtime.deadLetterEnabled,
     storeName: runtime.deadLetterStoreName,
     maxEntries: runtime.deadLetterMaxEntries,
+    retentionMs: runtime.deadLetterRetentionMs,
   });
   await deadLetterQueue.init();
   const incidentReporter = new IncidentReporter({
@@ -195,6 +199,30 @@ const run = async (): Promise<void> => {
       prewarm: prewarmScheduler.getStats(),
     }),
     getReliabilityReport: () => resilientExecutor.snapshot(),
+    purgeData: async () => {
+      const results: Record<string, unknown> = {};
+
+      try {
+        await responseCache.purge();
+        results.cache = { ok: true };
+      } catch (error) {
+        results.cache = { ok: false, error: (error as Error).message };
+      }
+
+      try {
+        results.sessions = await sessionStorage.purgeSlots(runtime.browserPoolSize);
+      } catch (error) {
+        results.sessions = { ok: false, error: (error as Error).message };
+      }
+
+      try {
+        results.dead_letter = await deadLetterQueue.purge();
+      } catch (error) {
+        results.dead_letter = { ok: false, error: (error as Error).message };
+      }
+
+      return results;
+    },
     isShuttingDown: () => shuttingDown,
     onActivity: () => standby.onActivity(),
     enqueueFetch: async (request) =>
@@ -225,6 +253,13 @@ const run = async (): Promise<void> => {
     fetchTimeoutMaxMs: runtime.fetchTimeoutMaxMs,
     requestBodyMaxBytes: runtime.requestBodyMaxBytes,
     apiKeyEnabled: runtime.apiKeyEnabled,
+    hmacSigningEnabled: runtime.hmacSigningEnabled,
+    rateLimitEnabled: runtime.rateLimitEnabled,
+    rateLimitWindowMs: runtime.rateLimitWindowMs,
+    rateLimitGlobalMax: runtime.rateLimitGlobalMax,
+    rateLimitIpMax: runtime.rateLimitIpMax,
+    rateLimitApiKeyMax: runtime.rateLimitApiKeyMax,
+    logRedactionEnabled: runtime.logRedactionEnabled,
     cacheProvider: runtime.cacheProvider,
     cacheTtlMs: runtime.cacheTtlMs,
     cacheStaleTtlMs: runtime.cacheStaleTtlMs,
@@ -255,6 +290,8 @@ const run = async (): Promise<void> => {
     deadLetterEnabled: runtime.deadLetterEnabled,
     deadLetterStoreName: runtime.deadLetterStoreName,
     deadLetterMaxEntries: runtime.deadLetterMaxEntries,
+    deadLetterRetentionMs: runtime.deadLetterRetentionMs,
+    sessionStorageRetentionMs: runtime.sessionStorageRetentionMs,
     incidentBlockedSpikeThreshold: runtime.incidentBlockedSpikeThreshold,
     incidentBlockedSpikeWindowMs: runtime.incidentBlockedSpikeWindowMs,
     incidentWebhookEnabled: Boolean(runtime.incidentWebhookUrl),

@@ -3,10 +3,13 @@ import { randomUUID } from "node:crypto";
 import { createMeta, createSuccessEnvelope } from "./api/envelope";
 import { createFetchRequestValidator } from "./api/schema-validation";
 import type { FetchRequestInput } from "./extraction/types";
+import { FixedWindowRateLimiter } from "./security/rate-limiter";
+import { verifyRequestSignature } from "./security/request-signature";
 import {
   AuthInvalidError,
   AuthRequiredError,
   NotFoundError,
+  RateLimitedError,
   ShuttingDownError,
   ValidationError,
   normalizeError,
@@ -23,6 +26,7 @@ export interface ServerRuntimeState {
   getAdapterHealth: () => unknown;
   getPerformanceReport: () => unknown;
   getReliabilityReport: () => unknown;
+  purgeData: () => Promise<unknown>;
   isShuttingDown: () => boolean;
   onActivity: () => void;
   enqueueFetch: (request: FetchRequestInput) => Promise<unknown>;
@@ -41,6 +45,12 @@ const sendError = (
   metaExtras: Record<string, unknown> = {},
 ): void => {
   const appError = normalizeError(error);
+  if (appError.code === "RATE_LIMITED") {
+    const retryAfterMs = appError.details?.retry_after_ms;
+    if (typeof retryAfterMs === "number" && Number.isFinite(retryAfterMs) && retryAfterMs > 0) {
+      res.setHeader("retry-after", String(Math.ceil(retryAfterMs / 1000)));
+    }
+  }
   json(
     res,
     appError.statusCode,
@@ -48,10 +58,10 @@ const sendError = (
   );
 };
 
-const readJsonBody = async (
+const readRawBody = async (
   req: IncomingMessage,
-  options: { maxBytes: number },
-): Promise<unknown> => {
+  options: { maxBytes: number; required?: boolean },
+): Promise<string> => {
   const chunks: Buffer[] = [];
   let size = 0;
 
@@ -73,12 +83,24 @@ const readJsonBody = async (
   });
 
   if (chunks.length === 0) {
+    if (options.required === false) return "";
     throw new ValidationError("Request body is required.");
   }
 
-  const raw = Buffer.concat(chunks).toString("utf8");
+  return Buffer.concat(chunks).toString("utf8");
+};
+
+const readJsonBody = async (
+  req: IncomingMessage,
+  options: { maxBytes: number; required?: boolean },
+): Promise<{ raw: string; parsed: unknown }> => {
+  const raw = await readRawBody(req, options);
+  if (!raw && options.required === false) {
+    return { raw, parsed: null };
+  }
+
   try {
-    return JSON.parse(raw) as unknown;
+    return { raw, parsed: JSON.parse(raw) as unknown };
   } catch {
     throw new ValidationError("Request body must be valid JSON.");
   }
@@ -103,6 +125,14 @@ const extractClientApiKey = (req: IncomingMessage): string | null => {
 
 const isPublicRoute = (method: string, path: string): boolean =>
   method === "GET" && (path === "/v1/health" || path === "/v1/ready");
+
+const extractClientIp = (req: IncomingMessage): string => {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.trim().length > 0) {
+    return forwarded.split(",")[0].trim();
+  }
+  return req.socket.remoteAddress ?? "unknown";
+};
 
 const ensureAuthorized = (runtime: RuntimeConfig, req: IncomingMessage, path: string): void => {
   if (!runtime.apiKeyEnabled) return;
@@ -136,6 +166,33 @@ const notFound = (req: IncomingMessage): NotFoundError =>
 
 export const createApiServer = (runtime: RuntimeConfig, state: ServerRuntimeState): Server => {
   const startedAt = Date.now();
+  const signing = {
+    enabled: runtime.hmacSigningEnabled,
+    secrets: runtime.hmacSecrets,
+    maxSkewSec: runtime.hmacMaxSkewSec,
+    signatureHeader: runtime.hmacSignatureHeader,
+    timestampHeader: runtime.hmacTimestampHeader,
+  };
+
+  const globalLimiter = runtime.rateLimitEnabled
+    ? new FixedWindowRateLimiter({
+        windowMs: runtime.rateLimitWindowMs,
+        limit: runtime.rateLimitGlobalMax,
+      })
+    : null;
+  const ipLimiter = runtime.rateLimitEnabled
+    ? new FixedWindowRateLimiter({
+        windowMs: runtime.rateLimitWindowMs,
+        limit: runtime.rateLimitIpMax,
+      })
+    : null;
+  const apiKeyLimiter = runtime.rateLimitEnabled
+    ? new FixedWindowRateLimiter({
+        windowMs: runtime.rateLimitWindowMs,
+        limit: runtime.rateLimitApiKeyMax,
+      })
+    : null;
+
   const validateFetchRequest = createFetchRequestValidator({
     minMs: runtime.fetchTimeoutMinMs,
     maxMs: runtime.fetchTimeoutMaxMs,
@@ -150,6 +207,7 @@ export const createApiServer = (runtime: RuntimeConfig, state: ServerRuntimeStat
     const method = req.method ?? "GET";
     const parsedUrl = new URL(req.url ?? "/", "http://shadow-api.local");
     const path = parsedUrl.pathname;
+    const pathWithQuery = `${parsedUrl.pathname}${parsedUrl.search}`;
 
     ensureAuthorized(runtime, req, path);
 
@@ -198,6 +256,48 @@ export const createApiServer = (runtime: RuntimeConfig, state: ServerRuntimeStat
       return;
     }
 
+    if (signing.enabled && method !== "POST" && !isPublicRoute(method, path)) {
+      verifyRequestSignature(signing, req, pathWithQuery, "");
+    }
+
+    if (runtime.rateLimitEnabled && !isPublicRoute(method, path)) {
+      const ip = extractClientIp(req);
+      const apiKey = extractClientApiKey(req);
+
+      const globalDecision = globalLimiter?.check("global");
+      if (globalDecision && !globalDecision.allowed) {
+        throw new RateLimitedError({
+          scope: "global",
+          retry_after_ms: globalDecision.retryAfterMs,
+          window_ms: globalDecision.windowMs,
+          limit: globalDecision.limit,
+        });
+      }
+
+      const ipDecision = ipLimiter?.check(`ip:${ip}`);
+      if (ipDecision && !ipDecision.allowed) {
+        throw new RateLimitedError({
+          scope: "ip",
+          ip,
+          retry_after_ms: ipDecision.retryAfterMs,
+          window_ms: ipDecision.windowMs,
+          limit: ipDecision.limit,
+        });
+      }
+
+      if (apiKey) {
+        const apiKeyDecision = apiKeyLimiter?.check(`api_key:${apiKey}`);
+        if (apiKeyDecision && !apiKeyDecision.allowed) {
+          throw new RateLimitedError({
+            scope: "api_key",
+            retry_after_ms: apiKeyDecision.retryAfterMs,
+            window_ms: apiKeyDecision.windowMs,
+            limit: apiKeyDecision.limit,
+          });
+        }
+      }
+    }
+
     state.onActivity();
 
     if (method === "GET" && path === "/v1/debug/queue") {
@@ -208,6 +308,33 @@ export const createApiServer = (runtime: RuntimeConfig, state: ServerRuntimeStat
           queue_depth: state.getQueueDepth(),
           queue_inflight: state.getQueueInflight(),
           shutting_down: state.isShuttingDown(),
+        }),
+      );
+      return;
+    }
+
+    if (method === "POST" && path === "/v1/admin/purge") {
+      if (!runtime.apiKeyEnabled) {
+        throw notFound(req);
+      }
+      if (state.isShuttingDown()) {
+        throw new ShuttingDownError();
+      }
+
+      const body = await readRawBody(req, {
+        maxBytes: runtime.requestBodyMaxBytes,
+        required: false,
+      });
+      if (signing.enabled) {
+        verifyRequestSignature(signing, req, pathWithQuery, body);
+      }
+
+      const purged = await state.purgeData();
+      json(
+        res,
+        200,
+        createSuccessEnvelope(requestId, {
+          purged,
         }),
       );
       return;
@@ -255,10 +382,14 @@ export const createApiServer = (runtime: RuntimeConfig, state: ServerRuntimeStat
         throw new ShuttingDownError();
       }
 
-      const payload = await readJsonBody(req, {
+      const body = await readJsonBody(req, {
         maxBytes: runtime.requestBodyMaxBytes,
       });
-      const fetchRequest = validateFetchRequest(payload);
+      if (signing.enabled) {
+        verifyRequestSignature(signing, req, pathWithQuery, body.raw);
+      }
+
+      const fetchRequest = validateFetchRequest(body.parsed);
       const result = await state.enqueueFetch(fetchRequest);
 
       json(

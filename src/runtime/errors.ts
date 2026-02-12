@@ -1,6 +1,8 @@
 export type AppErrorCode =
   | "AUTH_REQUIRED"
   | "AUTH_INVALID"
+  | "SIGNATURE_REQUIRED"
+  | "SIGNATURE_INVALID"
   | "NOT_FOUND"
   | "VALIDATION_ERROR"
   | "SOURCE_NOT_SUPPORTED"
@@ -8,6 +10,7 @@ export type AppErrorCode =
   | "SOURCE_QUARANTINED"
   | "SOURCE_BLOCKED"
   | "CIRCUIT_OPEN"
+  | "RATE_LIMITED"
   | "QUEUE_BACKPRESSURE"
   | "QUEUE_CLOSED"
   | "QUEUE_TIMEOUT"
@@ -76,6 +79,32 @@ export class AuthInvalidError extends AppError {
   }
 }
 
+export class SignatureRequiredError extends AppError {
+  public constructor(details?: Record<string, unknown>) {
+    super({
+      code: "SIGNATURE_REQUIRED",
+      message: "Request signature is required for this endpoint.",
+      statusCode: 401,
+      retryable: false,
+      details: details ?? null,
+    });
+    this.name = "SignatureRequiredError";
+  }
+}
+
+export class SignatureInvalidError extends AppError {
+  public constructor(message = "Request signature is invalid.", details?: Record<string, unknown>) {
+    super({
+      code: "SIGNATURE_INVALID",
+      message,
+      statusCode: 401,
+      retryable: false,
+      details: details ?? null,
+    });
+    this.name = "SignatureInvalidError";
+  }
+}
+
 export class SourceNotSupportedError extends AppError {
   public constructor(source: string) {
     super({
@@ -138,6 +167,19 @@ export class CircuitOpenError extends AppError {
       details: details ?? { source },
     });
     this.name = "CircuitOpenError";
+  }
+}
+
+export class RateLimitedError extends AppError {
+  public constructor(details?: Record<string, unknown>) {
+    super({
+      code: "RATE_LIMITED",
+      message: "Rate limit exceeded. Retry later.",
+      statusCode: 429,
+      retryable: true,
+      details: details ?? null,
+    });
+    this.name = "RateLimitedError";
   }
 }
 

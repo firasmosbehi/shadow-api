@@ -154,9 +154,20 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
   const envHost = process.env.HOST;
   const envPort = process.env.PORT;
   const envLogLevel = process.env.LOG_LEVEL;
+  const envLogRedactionEnabled = process.env.LOG_REDACTION_ENABLED;
   const envRequiredEnvVars = process.env.REQUIRED_ENV_VARS;
   const envApiKeyEnabled = process.env.API_KEY_ENABLED;
   const envApiKey = process.env.API_KEY;
+  const envHmacSigningEnabled = process.env.HMAC_SIGNING_ENABLED;
+  const envHmacSecrets = process.env.HMAC_SECRETS;
+  const envHmacMaxSkewSec = process.env.HMAC_MAX_SKEW_SEC;
+  const envHmacSignatureHeader = process.env.HMAC_SIGNATURE_HEADER;
+  const envHmacTimestampHeader = process.env.HMAC_TIMESTAMP_HEADER;
+  const envRateLimitEnabled = process.env.RATE_LIMIT_ENABLED;
+  const envRateLimitWindowMs = process.env.RATE_LIMIT_WINDOW_MS;
+  const envRateLimitGlobalMax = process.env.RATE_LIMIT_GLOBAL_MAX;
+  const envRateLimitIpMax = process.env.RATE_LIMIT_IP_MAX;
+  const envRateLimitApiKeyMax = process.env.RATE_LIMIT_API_KEY_MAX;
   const envBrowserPoolEnabled = process.env.BROWSER_POOL_ENABLED;
   const envBrowserPoolSize = process.env.BROWSER_POOL_SIZE;
   const envBrowserHeadless = process.env.BROWSER_HEADLESS;
@@ -168,6 +179,7 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
   const envSessionStorageEnabled = process.env.SESSION_STORAGE_ENABLED;
   const envSessionStoreName = process.env.SESSION_STORE_NAME;
   const envSessionStoreKeyPrefix = process.env.SESSION_STORE_KEY_PREFIX;
+  const envSessionStorageRetentionMs = process.env.SESSION_STORAGE_RETENTION_MS;
   const envRequestQueueConcurrency = process.env.REQUEST_QUEUE_CONCURRENCY;
   const envRequestQueueMaxSize = process.env.REQUEST_QUEUE_MAX_SIZE;
   const envRequestQueueTaskTimeoutMs = process.env.REQUEST_QUEUE_TASK_TIMEOUT_MS;
@@ -207,6 +219,7 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
   const envDeadLetterEnabled = process.env.DEAD_LETTER_ENABLED;
   const envDeadLetterStoreName = process.env.DEAD_LETTER_STORE_NAME;
   const envDeadLetterMaxEntries = process.env.DEAD_LETTER_MAX_ENTRIES;
+  const envDeadLetterRetentionMs = process.env.DEAD_LETTER_RETENTION_MS;
   const envIncidentBlockedSpikeThreshold = process.env.INCIDENT_BLOCKED_SPIKE_THRESHOLD;
   const envIncidentBlockedSpikeWindowMs = process.env.INCIDENT_BLOCKED_SPIKE_WINDOW_MS;
   const envIncidentWebhookUrl = process.env.INCIDENT_WEBHOOK_URL;
@@ -229,6 +242,13 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
       `\`logLevel\` must be one of ${ALLOWED_LOG_LEVELS.join(", ")}. Received: ${JSON.stringify(rawLogLevel)} (input \`logLevel\` or env \`LOG_LEVEL\`).`,
     );
   }
+
+  const logRedactionEnabled = parseBooleanWithValidation(
+    input.logRedactionEnabled ?? envLogRedactionEnabled,
+    "logRedactionEnabled",
+    issues,
+    true,
+  );
 
   const requiredEnvVars = parseRequiredEnvVars(input.requiredEnvVars, envRequiredEnvVars);
   for (const envName of requiredEnvVars) {
@@ -253,6 +273,86 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
       "`apiKey` is required when `apiKeyEnabled=true` (input `apiKey` or env `API_KEY`).",
     );
   }
+
+  const hmacSigningEnabled = parseBooleanWithValidation(
+    input.hmacSigningEnabled ?? envHmacSigningEnabled,
+    "hmacSigningEnabled",
+    issues,
+    false,
+  );
+
+  const hmacSecrets = parseStringList(input.hmacSecrets, envHmacSecrets);
+  if (hmacSigningEnabled && hmacSecrets.length === 0) {
+    issues.push(
+      "`hmacSecrets` must contain at least one secret when `hmacSigningEnabled=true` (input `hmacSecrets` or env `HMAC_SECRETS`).",
+    );
+  }
+
+  const hmacMaxSkewSec = parseIntegerWithRangeValidation(
+    input.hmacMaxSkewSec ?? envHmacMaxSkewSec,
+    "hmacMaxSkewSec",
+    issues,
+    300,
+    0,
+    3600,
+  );
+
+  const hmacSignatureHeader = parseNonEmptyString(
+    input.hmacSignatureHeader ?? envHmacSignatureHeader,
+    "hmacSignatureHeader",
+    issues,
+    "x-shadow-signature",
+  );
+
+  const hmacTimestampHeader = parseNonEmptyString(
+    input.hmacTimestampHeader ?? envHmacTimestampHeader,
+    "hmacTimestampHeader",
+    issues,
+    "x-shadow-timestamp",
+  );
+
+  const rateLimitEnabled = parseBooleanWithValidation(
+    input.rateLimitEnabled ?? envRateLimitEnabled,
+    "rateLimitEnabled",
+    issues,
+    false,
+  );
+
+  const rateLimitWindowMs = parseIntegerWithRangeValidation(
+    input.rateLimitWindowMs ?? envRateLimitWindowMs,
+    "rateLimitWindowMs",
+    issues,
+    10000,
+    1000,
+    600000,
+  );
+
+  const rateLimitGlobalMax = parseIntegerWithRangeValidation(
+    input.rateLimitGlobalMax ?? envRateLimitGlobalMax,
+    "rateLimitGlobalMax",
+    issues,
+    250,
+    1,
+    100000,
+  );
+
+  const rateLimitIpMax = parseIntegerWithRangeValidation(
+    input.rateLimitIpMax ?? envRateLimitIpMax,
+    "rateLimitIpMax",
+    issues,
+    150,
+    1,
+    100000,
+  );
+
+  const rateLimitApiKeyMax = parseIntegerWithRangeValidation(
+    input.rateLimitApiKeyMax ?? envRateLimitApiKeyMax,
+    "rateLimitApiKeyMax",
+    issues,
+    250,
+    1,
+    100000,
+  );
 
   const browserPoolEnabled = parseBooleanWithValidation(
     input.browserPoolEnabled ?? envBrowserPoolEnabled,
@@ -339,6 +439,15 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
     "sessionStoreKeyPrefix",
     issues,
     "session-slot",
+  );
+
+  const sessionStorageRetentionMs = parseIntegerWithRangeValidation(
+    input.sessionStorageRetentionMs ?? envSessionStorageRetentionMs,
+    "sessionStorageRetentionMs",
+    issues,
+    7 * 24 * 60 * 60 * 1000,
+    0,
+    365 * 24 * 60 * 60 * 1000,
   );
 
   const requestQueueConcurrency = parseIntegerWithRangeValidation(
@@ -679,6 +788,15 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
     50000,
   );
 
+  const deadLetterRetentionMs = parseIntegerWithRangeValidation(
+    input.deadLetterRetentionMs ?? envDeadLetterRetentionMs,
+    "deadLetterRetentionMs",
+    issues,
+    30 * 24 * 60 * 60 * 1000,
+    0,
+    365 * 24 * 60 * 60 * 1000,
+  );
+
   const incidentBlockedSpikeThreshold = parseIntegerWithRangeValidation(
     input.incidentBlockedSpikeThreshold ?? envIncidentBlockedSpikeThreshold,
     "incidentBlockedSpikeThreshold",
@@ -729,8 +847,19 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
     host,
     port: parsedPort,
     logLevel,
+    logRedactionEnabled,
     apiKeyEnabled,
     apiKey,
+    hmacSigningEnabled,
+    hmacSecrets,
+    hmacMaxSkewSec,
+    hmacSignatureHeader,
+    hmacTimestampHeader,
+    rateLimitEnabled,
+    rateLimitWindowMs,
+    rateLimitGlobalMax,
+    rateLimitIpMax,
+    rateLimitApiKeyMax,
     browserPoolEnabled,
     browserPoolSize,
     browserHeadless,
@@ -742,6 +871,7 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
     sessionStorageEnabled,
     sessionStoreName,
     sessionStoreKeyPrefix,
+    sessionStorageRetentionMs,
     requestQueueConcurrency,
     requestQueueMaxSize,
     requestQueueTaskTimeoutMs,
@@ -781,6 +911,7 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
     deadLetterEnabled,
     deadLetterStoreName,
     deadLetterMaxEntries,
+    deadLetterRetentionMs,
     incidentBlockedSpikeThreshold,
     incidentBlockedSpikeWindowMs,
     incidentWebhookUrl,

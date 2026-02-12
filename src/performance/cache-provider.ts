@@ -12,6 +12,7 @@ export interface CacheProvider<T> {
   get(key: string): Promise<CacheEnvelope<T> | null>;
   set(key: string, value: CacheEnvelope<T>): Promise<void>;
   delete(key: string): Promise<void>;
+  clear(): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -31,8 +32,12 @@ class MemoryCacheProvider<T> implements CacheProvider<T> {
     this.store.delete(key);
   }
 
-  public async close(): Promise<void> {
+  public async clear(): Promise<void> {
     this.store.clear();
+  }
+
+  public async close(): Promise<void> {
+    await this.clear();
   }
 }
 
@@ -40,7 +45,7 @@ interface RedisLikeClient {
   connect(): Promise<unknown>;
   get(key: string): Promise<string | null>;
   set(key: string, value: string, options?: { PX?: number }): Promise<unknown>;
-  del(key: string): Promise<unknown>;
+  del(key: string | string[]): Promise<unknown>;
   quit(): Promise<unknown>;
 }
 
@@ -71,6 +76,40 @@ class RedisCacheProvider<T> implements CacheProvider<T> {
 
   public async delete(key: string): Promise<void> {
     await this.client.del(this.keyFor(key));
+  }
+
+  public async clear(): Promise<void> {
+    const pattern = `${this.keyPrefix}:*`;
+    const client = this.client as unknown as {
+      scanIterator?: (options: { MATCH: string; COUNT: number }) => AsyncIterable<string>;
+      keys?: (pattern: string) => Promise<string[]>;
+      del: (key: string | string[]) => Promise<unknown>;
+    };
+
+    if (typeof client.scanIterator === "function") {
+      const batch: string[] = [];
+      for await (const key of client.scanIterator({ MATCH: pattern, COUNT: 500 })) {
+        batch.push(key);
+        if (batch.length >= 500) {
+          await client.del(batch);
+          batch.length = 0;
+        }
+      }
+      if (batch.length > 0) {
+        await client.del(batch);
+      }
+      return;
+    }
+
+    if (typeof client.keys === "function") {
+      const keys = await client.keys(pattern);
+      if (keys.length > 0) {
+        await client.del(keys);
+      }
+      return;
+    }
+
+    throw new Error("Redis client does not support scanIterator() or keys().");
   }
 
   public async close(): Promise<void> {

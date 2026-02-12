@@ -138,6 +138,10 @@ export class ResponseCache<T> {
     await this.provider.delete(key);
   }
 
+  public async purge(): Promise<void> {
+    await this.provider.clear();
+  }
+
   public async close(): Promise<void> {
     await this.provider.close();
   }

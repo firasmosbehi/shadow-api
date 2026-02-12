@@ -26,6 +26,7 @@ export interface DeadLetterQueueConfig {
   enabled: boolean;
   storeName: string;
   maxEntries: number;
+  retentionMs: number;
 }
 
 export class DeadLetterQueue {
@@ -35,6 +36,38 @@ export class DeadLetterQueue {
   private index: string[] = [];
   private readonly entries = new Map<string, DeadLetterEntry>();
 
+  private parseTimestamp(id: string): number | null {
+    const match = id.match(/^dlq_(\d+)_/);
+    if (!match) return null;
+    const parsed = Number(match[1]);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  private async pruneExpired(): Promise<void> {
+    if (!this.config.enabled || !this.store) return;
+    if (!this.config.retentionMs || this.config.retentionMs <= 0) return;
+
+    const now = Date.now();
+    const keep: string[] = [];
+    const expired: string[] = [];
+    for (const id of this.index) {
+      const ts = this.parseTimestamp(id);
+      if (ts && now - ts > this.config.retentionMs) {
+        expired.push(id);
+      } else {
+        keep.push(id);
+      }
+    }
+
+    if (expired.length === 0) return;
+    for (const id of expired) {
+      await this.store.setValue(this.keyFor(id), null);
+      this.entries.delete(id);
+    }
+    this.index = keep;
+    await this.store.setValue(this.indexKey, this.index);
+  }
+
   public constructor(config: DeadLetterQueueConfig) {
     this.config = config;
   }
@@ -43,6 +76,7 @@ export class DeadLetterQueue {
     if (!this.config.enabled) return;
     this.store = await Actor.openKeyValueStore(this.config.storeName);
     this.index = (await this.store.getValue<string[]>(this.indexKey)) ?? [];
+    await this.pruneExpired();
     const warmIds = this.index.slice(0, Math.min(this.index.length, this.config.maxEntries));
     for (const id of warmIds) {
       const entry = await this.store.getValue<DeadLetterEntry | null>(this.keyFor(id));
@@ -52,6 +86,7 @@ export class DeadLetterQueue {
 
   public async push(entry: Omit<DeadLetterEntry, "id" | "created_at">): Promise<DeadLetterEntry | null> {
     if (!this.config.enabled || !this.store) return null;
+    await this.pruneExpired();
 
     const now = new Date().toISOString();
     const id = `dlq_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -75,6 +110,19 @@ export class DeadLetterQueue {
     }
     await this.store.setValue(this.indexKey, this.index);
     return record;
+  }
+
+  public async purge(): Promise<{ removed: number }> {
+    if (!this.config.enabled || !this.store) return { removed: 0 };
+    let removed = 0;
+    for (const id of this.index) {
+      await this.store.setValue(this.keyFor(id), null);
+      removed += 1;
+    }
+    this.index = [];
+    this.entries.clear();
+    await this.store.setValue(this.indexKey, this.index);
+    return { removed };
   }
 
   public async snapshot(limit = 25): Promise<DeadLetterSnapshot> {

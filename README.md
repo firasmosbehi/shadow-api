@@ -56,6 +56,10 @@ Initial P0 product artifacts are documented in `docs/product/`:
 
 This project must be used in compliance with each target site's terms of service, local laws, and privacy requirements.
 
+Security and compliance references:
+
+- `docs/security/README.md`
+
 ## Runtime Scaffold (P0-11)
 
 The initial Apify Actor scaffold is now in place:
