@@ -7,6 +7,8 @@ export interface FetchRequestInput {
   fields?: string[];
   freshness?: string;
   timeout_ms?: number;
+  fast_mode?: boolean;
+  cache_mode?: "default" | "bypass" | "refresh";
 }
 
 export interface ExtractionDocument {
@@ -69,6 +71,22 @@ export interface ExtractionResult {
   challenge: ChallengeDetectionResult | null;
   adapter_version: string;
   latency_ms: number;
+  stage_latency_ms?: Record<string, number>;
+  cache?: {
+    provider: "memory" | "redis";
+    key: string;
+    hit: boolean;
+    state: "miss" | "fresh" | "stale";
+    stale_while_revalidate: boolean;
+    revalidating: boolean;
+    ttl_ms: number;
+    stale_ttl_ms: number;
+  };
+  performance?: {
+    deduped: boolean;
+    fast_mode: boolean;
+    benchmark_tag?: string;
+  };
   fetched_at: string;
 }
 

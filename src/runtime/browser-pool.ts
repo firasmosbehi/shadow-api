@@ -1,5 +1,5 @@
 import { log } from "apify";
-import type { Browser, BrowserContext, Page } from "playwright-core";
+import type { Browser, BrowserContext, BrowserContextOptions, Page } from "playwright-core";
 import { navigateWithRetry, waitForPageReady } from "./navigation";
 import { SessionStorageManager } from "./session-storage";
 
@@ -8,6 +8,8 @@ export interface BrowserPoolConfig {
   size: number;
   headless: boolean;
   launchTimeoutMs: number;
+  optimizedFlagsEnabled: boolean;
+  blockResources: boolean;
   sessionStorage: SessionStorageManager;
 }
 
@@ -136,14 +138,25 @@ export class BrowserPoolManager {
     if (this.browser) return;
 
     const { chromium } = await import("playwright-core");
+    const args = ["--no-sandbox", "--disable-dev-shm-usage"];
+    if (this.config.optimizedFlagsEnabled) {
+      args.push(
+        "--disable-background-networking",
+        "--disable-background-timer-throttling",
+        "--disable-renderer-backgrounding",
+        "--disable-features=Translate,BackForwardCache",
+      );
+    }
     this.browser = await chromium.launch({
       headless: this.config.headless,
       timeout: this.config.launchTimeoutMs,
-      args: ["--no-sandbox", "--disable-dev-shm-usage"],
+      args,
     });
     log.info("Browser pool launched Playwright browser.", {
       headless: this.config.headless,
       launchTimeoutMs: this.config.launchTimeoutMs,
+      optimizedFlagsEnabled: this.config.optimizedFlagsEnabled,
+      blockResources: this.config.blockResources,
     });
   }
 
@@ -153,9 +166,24 @@ export class BrowserPoolManager {
     }
 
     const persistedState = await this.config.sessionStorage.load(slot);
-    const context = await this.browser.newContext(
-      persistedState ? { storageState: persistedState } : undefined,
-    );
+    const contextOptions: BrowserContextOptions = {
+      serviceWorkers: "block",
+      ignoreHTTPSErrors: true,
+      colorScheme: "light",
+      reducedMotion: "reduce",
+      ...(persistedState ? { storageState: persistedState } : {}),
+    };
+    const context = await this.browser.newContext(contextOptions);
+    if (this.config.blockResources) {
+      await context.route("**/*", (route) => {
+        const type = route.request().resourceType();
+        if (type === "image" || type === "media" || type === "font") {
+          void route.abort();
+          return;
+        }
+        void route.continue();
+      });
+    }
     const page = await context.newPage();
     await navigateWithRetry(page, "about:blank", {
       attempts: 2,

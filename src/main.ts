@@ -2,11 +2,16 @@ import { Actor, log } from "apify";
 import type { AddressInfo } from "node:net";
 import { buildRuntimeConfig, ConfigValidationError } from "./config";
 import { createApiServer } from "./server";
+import type { ExtractionResult, FetchRequestInput } from "./extraction/types";
 import { BrowserPoolManager } from "./runtime/browser-pool";
 import { AsyncRequestQueue } from "./runtime/request-queue";
 import { SessionStorageManager } from "./runtime/session-storage";
 import { StandbyLifecycleController } from "./runtime/standby-lifecycle";
 import { ExtractionService } from "./extraction/service";
+import { createCacheProvider } from "./performance/cache-provider";
+import { FetchPipeline } from "./performance/fetch-pipeline";
+import { PrewarmScheduler } from "./performance/prewarm-scheduler";
+import { ResponseCache } from "./performance/response-cache";
 import type { ActorInput } from "./types";
 
 const closeServer = async (server: ReturnType<typeof createApiServer>): Promise<void> =>
@@ -21,6 +26,36 @@ const sleep = async (ms: number): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+
+const toPrewarmRequests = (targets: Array<Record<string, unknown>>): FetchRequestInput[] =>
+  {
+    const output: FetchRequestInput[] = [];
+    for (const target of targets) {
+      const source = typeof target.source === "string" ? target.source.trim() : "";
+      const operation = typeof target.operation === "string" ? target.operation.trim() : "";
+      const payload =
+        target.target && typeof target.target === "object"
+          ? (target.target as Record<string, unknown>)
+          : null;
+      if (!source || !operation || !payload) continue;
+
+      const fields =
+        Array.isArray(target.fields) && target.fields.every((entry) => typeof entry === "string")
+          ? (target.fields as string[])
+          : undefined;
+      const timeoutMs = typeof target.timeout_ms === "number" ? target.timeout_ms : undefined;
+      output.push({
+        source,
+        operation,
+        target: payload,
+        fields,
+        timeout_ms: timeoutMs,
+        cache_mode: "refresh" as const,
+        fast_mode: true,
+      });
+    }
+    return output;
+  };
 
 const run = async (): Promise<void> => {
   await Actor.init();
@@ -41,6 +76,8 @@ const run = async (): Promise<void> => {
     size: runtime.browserPoolSize,
     headless: runtime.browserHeadless,
     launchTimeoutMs: runtime.browserLaunchTimeoutMs,
+    optimizedFlagsEnabled: runtime.browserOptimizedFlagsEnabled,
+    blockResources: runtime.browserBlockResources,
     sessionStorage,
   });
 
@@ -63,6 +100,30 @@ const run = async (): Promise<void> => {
     defaultTimeoutMs: runtime.fetchTimeoutDefaultMs,
     maxTimeoutMs: runtime.fetchTimeoutMaxMs,
   });
+  const cacheProvider = await createCacheProvider<ExtractionResult>({
+    provider: runtime.cacheProvider,
+    redisUrl: runtime.redisUrl,
+    redisKeyPrefix: runtime.redisKeyPrefix,
+  });
+  const responseCache = new ResponseCache({
+    provider: cacheProvider,
+    ttlMs: runtime.cacheTtlMs,
+    staleTtlMs: runtime.cacheStaleTtlMs,
+    staleWhileRevalidate: runtime.cacheSwrEnabled,
+  });
+  const fetchPipeline = new FetchPipeline({
+    extractionService,
+    cache: responseCache,
+    fastModeEnabled: runtime.fastModeEnabled,
+    fastModeMaxFields: runtime.fastModeMaxFields,
+  });
+  const prewarmScheduler = new PrewarmScheduler({
+    enabled: runtime.prewarmEnabled,
+    intervalMs: runtime.prewarmIntervalMs,
+    targets: toPrewarmRequests(runtime.prewarmTargets),
+    runRequest: async (request) => fetchPipeline.prewarm(request),
+  });
+  prewarmScheduler.start();
 
   let shuttingDown = false;
 
@@ -73,12 +134,16 @@ const run = async (): Promise<void> => {
     getStandbyMode: () => standby.getStatus().mode,
     getStandbyIdleMs: () => standby.getStatus().idleForMs,
     getAdapterHealth: () => extractionService.getAdapterHealth(),
+    getPerformanceReport: () => ({
+      pipeline: fetchPipeline.getReport(),
+      prewarm: prewarmScheduler.getStats(),
+    }),
     isShuttingDown: () => shuttingDown,
     onActivity: () => standby.onActivity(),
     enqueueFetch: async (request) =>
       requestQueue.enqueue(async () => {
         await sleep(runtime.mockFetchDelayMs);
-        return extractionService.execute(request);
+        return fetchPipeline.execute(request);
       }),
   });
 
@@ -103,6 +168,17 @@ const run = async (): Promise<void> => {
     fetchTimeoutMaxMs: runtime.fetchTimeoutMaxMs,
     requestBodyMaxBytes: runtime.requestBodyMaxBytes,
     apiKeyEnabled: runtime.apiKeyEnabled,
+    cacheProvider: runtime.cacheProvider,
+    cacheTtlMs: runtime.cacheTtlMs,
+    cacheStaleTtlMs: runtime.cacheStaleTtlMs,
+    cacheSwrEnabled: runtime.cacheSwrEnabled,
+    fastModeEnabled: runtime.fastModeEnabled,
+    fastModeMaxFields: runtime.fastModeMaxFields,
+    prewarmEnabled: runtime.prewarmEnabled,
+    prewarmIntervalMs: runtime.prewarmIntervalMs,
+    prewarmTargetsCount: runtime.prewarmTargets.length,
+    browserOptimizedFlagsEnabled: runtime.browserOptimizedFlagsEnabled,
+    browserBlockResources: runtime.browserBlockResources,
     shutdownDrainTimeoutMs: runtime.shutdownDrainTimeoutMs,
     listeningAddress: address?.address ?? runtime.host,
   });
@@ -125,6 +201,8 @@ const run = async (): Promise<void> => {
       });
     }
 
+    prewarmScheduler.stop();
+    await fetchPipeline.close();
     await standby.stop();
   };
 

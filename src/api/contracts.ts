@@ -33,6 +33,12 @@ export const MVP_ENDPOINTS: EndpointContract[] = [
     requiresApiKey: true,
   },
   {
+    method: "GET",
+    path: "/v1/debug/performance",
+    summary: "Performance and caching telemetry",
+    requiresApiKey: true,
+  },
+  {
     method: "POST",
     path: "/v1/fetch",
     summary: "Extract normalized data from supported sources",
@@ -89,6 +95,18 @@ export const buildFetchRequestSchema = (
       maximum: timeoutPolicy.maxMs,
       default: timeoutPolicy.defaultMs,
     },
+    fast_mode: {
+      type: "boolean",
+      default: false,
+      description: "Enable partial-response fast path for latency-sensitive callers.",
+    },
+    cache_mode: {
+      type: "string",
+      enum: ["default", "bypass", "refresh"],
+      default: "default",
+      description:
+        "Cache behavior override. `bypass` skips cache; `refresh` forces refresh and updates cache.",
+    },
   },
 });
 
@@ -102,6 +120,8 @@ export const EXAMPLES = {
     fields: ["display_name", "handle", "follower_count"],
     freshness: "hot",
     timeout_ms: 8000,
+    fast_mode: false,
+    cache_mode: "default",
   },
   fetchResponse: {
     ok: true,

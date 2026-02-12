@@ -136,7 +136,9 @@ export class ExtractionService {
   public async execute(request: FetchRequestInput): Promise<ExtractionResult> {
     const started = Date.now();
     const requestId = randomUUID();
+    const stageLatencyMs: Record<string, number> = {};
 
+    const validationStarted = Date.now();
     const source = normalizeSourceKey(request.source);
     const operation = normalizeOperationKey(request.operation);
     const adapter = this.adapterMap.get(source);
@@ -157,14 +159,20 @@ export class ExtractionService {
       1000,
       this.maxTimeoutMs,
     );
+    stageLatencyMs.validation_ms = Date.now() - validationStarted;
 
     try {
+      const resolveDocumentStarted = Date.now();
       const document = await this.resolveDocument(source, request.target, timeoutMs);
+      stageLatencyMs.resolve_document_ms = Date.now() - resolveDocumentStarted;
+
+      const challengeStarted = Date.now();
       const challenge = detectChallengeSignals({
         html: document.html,
         url: document.url,
         statusCode: document.statusCode,
       });
+      stageLatencyMs.challenge_detection_ms = Date.now() - challengeStarted;
 
       if (challenge.blocked) {
         this.health.recordFailure(source, {
@@ -176,9 +184,11 @@ export class ExtractionService {
           operation,
           challenge,
           requestId,
+          stage_latency_ms: stageLatencyMs,
         });
       }
 
+      const adapterExtractStarted = Date.now();
       const adapterOutput = await adapter.extract({
         operation,
         target: request.target,
@@ -186,16 +196,20 @@ export class ExtractionService {
         timeoutMs,
         document,
       });
+      stageLatencyMs.adapter_extract_ms = Date.now() - adapterExtractStarted;
 
+      const normalizeStarted = Date.now();
       const normalizedData = normalizeOperation(source, operation, adapterOutput.rawData);
       const unknownFields = findUnknownRequestedFields(normalizedData, request.fields);
       const data = selectRequestedFields(normalizedData, request.fields);
+      stageLatencyMs.normalize_ms = Date.now() - normalizeStarted;
       const warnings = [...adapterOutput.warnings];
       if (unknownFields.length > 0) {
         warnings.push(`unknown_requested_fields:${unknownFields.join(",")}`);
       }
 
       const latency = Date.now() - started;
+      stageLatencyMs.extraction_total_ms = latency;
       this.health.recordSuccess(source, latency);
 
       return {
@@ -208,8 +222,9 @@ export class ExtractionService {
         warnings,
         pagination: adapterOutput.pagination,
         challenge: null,
-        adapter_version: "0.1.0-m3",
+        adapter_version: "0.1.0-m5",
         latency_ms: latency,
+        stage_latency_ms: stageLatencyMs,
         fetched_at: new Date().toISOString(),
       };
     } catch (error) {

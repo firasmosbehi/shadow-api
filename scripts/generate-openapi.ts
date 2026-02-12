@@ -90,6 +90,31 @@ const document = {
         },
       },
     },
+    "/v1/debug/performance": {
+      get: {
+        tags: ["Operations"],
+        summary: "Performance, cache, and prewarm telemetry",
+        security: [{ ApiKeyHeader: [] }, { BearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "Performance telemetry response",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+              },
+            },
+          },
+          default: {
+            description: "Error response",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorEnvelope" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/v1/fetch": {
       post: {
         tags: ["Extraction"],

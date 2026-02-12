@@ -5,6 +5,7 @@ M4 delivers a stable REST contract for MVP endpoints with standardized envelope 
 - `GET /v1/health`
 - `GET /v1/ready`
 - `GET /v1/adapters/health`
+- `GET /v1/debug/performance`
 - `POST /v1/fetch`
 
 ## Authentication
@@ -24,6 +25,13 @@ When `API_KEY_ENABLED=true`, all endpoints except `GET /v1/health` and `GET /v1/
 
 Request payload `timeout_ms` is validated against this policy.
 
+## Fetch Options
+
+`POST /v1/fetch` supports performance-specific flags:
+
+- `fast_mode` — enable partial-response fast path
+- `cache_mode` — `default`, `bypass`, or `refresh`
+
 ## Generated Artifacts
 
 - OpenAPI spec: `docs/api/openapi.json`
@@ -41,4 +49,5 @@ npm run generate:api-artifacts
 npm run build
 npm run verify:fixtures
 npm run verify:api-contract
+npm run benchmark:hot-path
 ```

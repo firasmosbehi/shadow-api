@@ -42,6 +42,14 @@ const collection = {
       },
     },
     {
+      name: "Debug Performance",
+      request: {
+        method: "GET",
+        header: [{ key: "x-api-key", value: "{{apiKey}}" }],
+        url: "{{baseUrl}}/v1/debug/performance",
+      },
+    },
+    {
       name: "Fetch",
       request: {
         method: "POST",

@@ -91,6 +91,52 @@ const parseNonEmptyString = (
   return normalized;
 };
 
+const parseEnumWithValidation = <T extends string>(
+  value: string | undefined,
+  fieldName: string,
+  issues: string[],
+  fallback: T,
+  allowed: readonly T[],
+): T => {
+  if (typeof value !== "string") return fallback;
+  const normalized = value.trim().toLowerCase();
+  const matched = allowed.find((entry) => entry.toLowerCase() === normalized);
+  if (!matched) {
+    issues.push(
+      `\`${fieldName}\` must be one of ${allowed.join(", ")}. Received: ${JSON.stringify(value)}.`,
+    );
+    return fallback;
+  }
+  return matched;
+};
+
+const parseObjectArray = (
+  value: Array<Record<string, unknown>> | string | undefined,
+  fieldName: string,
+  issues: string[],
+): Array<Record<string, unknown>> => {
+  if (Array.isArray(value)) {
+    return value.filter((entry) => typeof entry === "object" && entry !== null);
+  }
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) {
+      issues.push(`\`${fieldName}\` must be a JSON array of objects.`);
+      return [];
+    }
+    return parsed.filter(
+      (entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry),
+    ) as Array<Record<string, unknown>>;
+  } catch {
+    issues.push(`\`${fieldName}\` must be valid JSON array when provided as string.`);
+    return [];
+  }
+};
+
 export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
   const issues: string[] = [];
 
@@ -118,6 +164,19 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
   const envFetchTimeoutMinMs = process.env.FETCH_TIMEOUT_MIN_MS;
   const envFetchTimeoutMaxMs = process.env.FETCH_TIMEOUT_MAX_MS;
   const envRequestBodyMaxBytes = process.env.REQUEST_BODY_MAX_BYTES;
+  const envCacheProvider = process.env.CACHE_PROVIDER;
+  const envCacheTtlMs = process.env.CACHE_TTL_MS;
+  const envCacheStaleTtlMs = process.env.CACHE_STALE_TTL_MS;
+  const envCacheSwrEnabled = process.env.CACHE_SWR_ENABLED;
+  const envRedisUrl = process.env.REDIS_URL;
+  const envRedisKeyPrefix = process.env.REDIS_KEY_PREFIX;
+  const envFastModeEnabled = process.env.FAST_MODE_ENABLED;
+  const envFastModeMaxFields = process.env.FAST_MODE_MAX_FIELDS;
+  const envPrewarmEnabled = process.env.PREWARM_ENABLED;
+  const envPrewarmIntervalMs = process.env.PREWARM_INTERVAL_MS;
+  const envPrewarmTargets = process.env.PREWARM_TARGETS;
+  const envBrowserOptimizedFlagsEnabled = process.env.BROWSER_OPTIMIZED_FLAGS_ENABLED;
+  const envBrowserBlockResources = process.env.BROWSER_BLOCK_RESOURCES;
   const envShutdownDrainTimeoutMs = process.env.SHUTDOWN_DRAIN_TIMEOUT_MS;
   const envMockFetchDelayMs = process.env.MOCK_FETCH_DELAY_MS;
 
@@ -328,6 +387,108 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
     10_000_000,
   );
 
+  const cacheProvider = parseEnumWithValidation(
+    input.cacheProvider ?? envCacheProvider,
+    "cacheProvider",
+    issues,
+    "memory",
+    ["memory", "redis"] as const,
+  );
+
+  const cacheTtlMs = parseIntegerWithRangeValidation(
+    input.cacheTtlMs ?? envCacheTtlMs,
+    "cacheTtlMs",
+    issues,
+    120000,
+    1000,
+    3600000,
+  );
+
+  const cacheStaleTtlMs = parseIntegerWithRangeValidation(
+    input.cacheStaleTtlMs ?? envCacheStaleTtlMs,
+    "cacheStaleTtlMs",
+    issues,
+    300000,
+    0,
+    3600000,
+  );
+
+  const cacheSwrEnabled = parseBooleanWithValidation(
+    input.cacheSwrEnabled ?? envCacheSwrEnabled,
+    "cacheSwrEnabled",
+    issues,
+    true,
+  );
+
+  const redisUrlRaw = input.redisUrl ?? envRedisUrl;
+  const redisUrl =
+    typeof redisUrlRaw === "string" && redisUrlRaw.trim().length > 0
+      ? redisUrlRaw.trim()
+      : null;
+
+  const redisKeyPrefix = parseNonEmptyString(
+    input.redisKeyPrefix ?? envRedisKeyPrefix,
+    "redisKeyPrefix",
+    issues,
+    "shadow-api:cache",
+  );
+
+  if (cacheProvider === "redis" && !redisUrl) {
+    issues.push("`redisUrl` must be set when `cacheProvider=redis`.");
+  }
+
+  const fastModeEnabled = parseBooleanWithValidation(
+    input.fastModeEnabled ?? envFastModeEnabled,
+    "fastModeEnabled",
+    issues,
+    true,
+  );
+
+  const fastModeMaxFields = parseIntegerWithRangeValidation(
+    input.fastModeMaxFields ?? envFastModeMaxFields,
+    "fastModeMaxFields",
+    issues,
+    3,
+    1,
+    20,
+  );
+
+  const prewarmEnabled = parseBooleanWithValidation(
+    input.prewarmEnabled ?? envPrewarmEnabled,
+    "prewarmEnabled",
+    issues,
+    false,
+  );
+
+  const prewarmIntervalMs = parseIntegerWithRangeValidation(
+    input.prewarmIntervalMs ?? envPrewarmIntervalMs,
+    "prewarmIntervalMs",
+    issues,
+    30000,
+    1000,
+    3600000,
+  );
+
+  const prewarmTargets = parseObjectArray(
+    input.prewarmTargets ?? envPrewarmTargets,
+    "prewarmTargets",
+    issues,
+  );
+
+  const browserOptimizedFlagsEnabled = parseBooleanWithValidation(
+    input.browserOptimizedFlagsEnabled ?? envBrowserOptimizedFlagsEnabled,
+    "browserOptimizedFlagsEnabled",
+    issues,
+    true,
+  );
+
+  const browserBlockResources = parseBooleanWithValidation(
+    input.browserBlockResources ?? envBrowserBlockResources,
+    "browserBlockResources",
+    issues,
+    true,
+  );
+
   const shutdownDrainTimeoutMs = parseIntegerWithRangeValidation(
     input.shutdownDrainTimeoutMs ?? envShutdownDrainTimeoutMs,
     "shutdownDrainTimeoutMs",
@@ -374,6 +535,19 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
     fetchTimeoutMinMs,
     fetchTimeoutMaxMs,
     requestBodyMaxBytes,
+    cacheProvider,
+    cacheTtlMs,
+    cacheStaleTtlMs,
+    cacheSwrEnabled,
+    redisUrl,
+    redisKeyPrefix,
+    fastModeEnabled,
+    fastModeMaxFields,
+    prewarmEnabled,
+    prewarmIntervalMs,
+    prewarmTargets,
+    browserOptimizedFlagsEnabled,
+    browserBlockResources,
     shutdownDrainTimeoutMs,
     mockFetchDelayMs,
   };

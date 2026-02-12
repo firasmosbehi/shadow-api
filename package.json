@@ -16,7 +16,8 @@
     "verify:api-contract": "tsx scripts/verify-api-contract.ts",
     "generate:openapi": "tsx scripts/generate-openapi.ts",
     "generate:postman": "tsx scripts/generate-postman.ts",
-    "generate:api-artifacts": "npm run generate:openapi && npm run generate:postman"
+    "generate:api-artifacts": "npm run generate:openapi && npm run generate:postman",
+    "benchmark:hot-path": "tsx scripts/benchmark-hot-path.ts"
   },
   "keywords": [
     "apify",
@@ -34,7 +35,8 @@
     "apify": "^3.5.1",
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.5",
-    "playwright-core": "^1.50.1"
+    "playwright-core": "^1.50.1",
+    "redis": "^4.7.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

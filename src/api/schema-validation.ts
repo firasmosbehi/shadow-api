@@ -28,6 +28,11 @@ const normalizeFetchRequest = (
     typeof payload.timeout_ms === "number"
       ? payload.timeout_ms
       : timeoutPolicy.defaultMs;
+  const fast_mode = payload.fast_mode === true;
+  const cache_mode =
+    payload.cache_mode === "bypass" || payload.cache_mode === "refresh"
+      ? payload.cache_mode
+      : "default";
 
   if (!source || !operation) {
     throw new ValidationError("`source` and `operation` must be non-empty strings.");
@@ -40,6 +45,8 @@ const normalizeFetchRequest = (
     fields,
     freshness,
     timeout_ms,
+    fast_mode,
+    cache_mode,
   };
 };
 

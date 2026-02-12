@@ -1,0 +1,17 @@
+{
+  "generated_at": "2026-02-12T12:50:23.979Z",
+  "benchmark": "m5-hot-path",
+  "base_url": "http://127.0.0.1:3600",
+  "warmup_requests": 20,
+  "benchmark_requests": 120,
+  "concurrency": 8,
+  "target_p50_ms": 2000,
+  "stats": {
+    "count": 120,
+    "min_ms": 1,
+    "max_ms": 6,
+    "avg_ms": 3.73,
+    "p50_ms": 4,
+    "p95_ms": 6
+  }
+}

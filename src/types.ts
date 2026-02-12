@@ -23,6 +23,19 @@ export interface ActorInput {
   fetchTimeoutMinMs?: number;
   fetchTimeoutMaxMs?: number;
   requestBodyMaxBytes?: number;
+  cacheProvider?: "memory" | "redis";
+  cacheTtlMs?: number;
+  cacheStaleTtlMs?: number;
+  cacheSwrEnabled?: boolean;
+  redisUrl?: string;
+  redisKeyPrefix?: string;
+  fastModeEnabled?: boolean;
+  fastModeMaxFields?: number;
+  prewarmEnabled?: boolean;
+  prewarmIntervalMs?: number;
+  prewarmTargets?: Array<Record<string, unknown>>;
+  browserOptimizedFlagsEnabled?: boolean;
+  browserBlockResources?: boolean;
   shutdownDrainTimeoutMs?: number;
   mockFetchDelayMs?: number;
 }
@@ -51,6 +64,19 @@ export interface RuntimeConfig {
   fetchTimeoutMinMs: number;
   fetchTimeoutMaxMs: number;
   requestBodyMaxBytes: number;
+  cacheProvider: "memory" | "redis";
+  cacheTtlMs: number;
+  cacheStaleTtlMs: number;
+  cacheSwrEnabled: boolean;
+  redisUrl: string | null;
+  redisKeyPrefix: string;
+  fastModeEnabled: boolean;
+  fastModeMaxFields: number;
+  prewarmEnabled: boolean;
+  prewarmIntervalMs: number;
+  prewarmTargets: Array<Record<string, unknown>>;
+  browserOptimizedFlagsEnabled: boolean;
+  browserBlockResources: boolean;
   shutdownDrainTimeoutMs: number;
   mockFetchDelayMs: number;
 }

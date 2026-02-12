@@ -43,6 +43,19 @@
       }
     },
     {
+      "name": "Debug Performance",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "x-api-key",
+            "value": "{{apiKey}}"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/debug/performance"
+      }
+    },
+    {
       "name": "Fetch",
       "request": {
         "method": "POST",
@@ -58,7 +71,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"source\": \"x\",\n  \"operation\": \"profile\",\n  \"target\": {\n    \"handle\": \"openai\"\n  },\n  \"fields\": [\n    \"display_name\",\n    \"handle\",\n    \"follower_count\"\n  ],\n  \"freshness\": \"hot\",\n  \"timeout_ms\": 8000\n}"
+          "raw": "{\n  \"source\": \"x\",\n  \"operation\": \"profile\",\n  \"target\": {\n    \"handle\": \"openai\"\n  },\n  \"fields\": [\n    \"display_name\",\n    \"handle\",\n    \"follower_count\"\n  ],\n  \"freshness\": \"hot\",\n  \"timeout_ms\": 8000,\n  \"fast_mode\": false,\n  \"cache_mode\": \"default\"\n}"
         },
         "url": "{{baseUrl}}/v1/fetch"
       }

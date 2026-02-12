@@ -71,6 +71,18 @@
       "description": "Playwright browser launch timeout in milliseconds.",
       "default": 30000
     },
+    "browserOptimizedFlagsEnabled": {
+      "title": "Browser optimized flags enabled",
+      "type": "boolean",
+      "description": "Enable performance-oriented browser launch/context flags.",
+      "default": true
+    },
+    "browserBlockResources": {
+      "title": "Browser block resources",
+      "type": "boolean",
+      "description": "Block image/font/media requests in warm contexts to reduce overhead.",
+      "default": true
+    },
     "standbyEnabled": {
       "title": "Standby lifecycle enabled",
       "type": "boolean",
@@ -154,6 +166,81 @@
       "type": "integer",
       "description": "Maximum JSON body size accepted by API endpoints.",
       "default": 1000000
+    },
+    "cacheProvider": {
+      "title": "Cache provider",
+      "type": "string",
+      "description": "Cache backend for hot-path responses.",
+      "default": "memory",
+      "enum": [
+        "memory",
+        "redis"
+      ]
+    },
+    "cacheTtlMs": {
+      "title": "Cache TTL (ms)",
+      "type": "integer",
+      "description": "Fresh cache time-to-live for responses.",
+      "default": 120000
+    },
+    "cacheStaleTtlMs": {
+      "title": "Cache stale TTL (ms)",
+      "type": "integer",
+      "description": "Additional stale window for stale-while-revalidate responses.",
+      "default": 300000
+    },
+    "cacheSwrEnabled": {
+      "title": "Cache SWR enabled",
+      "type": "boolean",
+      "description": "Enable stale-while-revalidate behavior for expired entries.",
+      "default": true
+    },
+    "redisUrl": {
+      "title": "Redis URL",
+      "type": "string",
+      "description": "Redis connection URL when cache provider is redis.",
+      "default": "",
+      "isSecret": true
+    },
+    "redisKeyPrefix": {
+      "title": "Redis key prefix",
+      "type": "string",
+      "description": "Prefix used for Redis cache keys.",
+      "default": "shadow-api:cache"
+    },
+    "fastModeEnabled": {
+      "title": "Fast mode enabled",
+      "type": "boolean",
+      "description": "Allow partial fast responses with limited field sets.",
+      "default": true
+    },
+    "fastModeMaxFields": {
+      "title": "Fast mode max fields",
+      "type": "integer",
+      "description": "Max number of fields returned when fast mode is enabled.",
+      "default": 3
+    },
+    "prewarmEnabled": {
+      "title": "Prewarm enabled",
+      "type": "boolean",
+      "description": "Enable periodic target prewarming jobs.",
+      "default": false
+    },
+    "prewarmIntervalMs": {
+      "title": "Prewarm interval (ms)",
+      "type": "integer",
+      "description": "Interval for prewarm scheduler runs.",
+      "default": 30000
+    },
+    "prewarmTargets": {
+      "title": "Prewarm targets",
+      "type": "array",
+      "description": "Target requests to refresh into cache proactively.",
+      "items": {
+        "type": "object"
+      },
+      "editor": "json",
+      "prefill": []
     },
     "shutdownDrainTimeoutMs": {
       "title": "Shutdown drain timeout (ms)",

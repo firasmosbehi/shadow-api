@@ -113,6 +113,8 @@ const run = async (): Promise<void> => {
         target: { handle: "openai", mockHtml: mockXHtml },
         fields: ["display_name", "handle", "follower_count"],
         timeout_ms: 6000,
+        fast_mode: true,
+        cache_mode: "default",
       }),
     });
     const okFetch = await okFetchResponse.json();
@@ -127,6 +129,13 @@ const run = async (): Promise<void> => {
     assert(adaptersHealthResponse.status === 200, "adapter health should return 200");
     assert(adaptersHealth.ok === true, "adapter health envelope ok should be true");
 
+    const debugPerformanceResponse = await fetch(`${baseUrl}/v1/debug/performance`, {
+      headers: { "x-api-key": apiKey },
+    });
+    const debugPerformance = await debugPerformanceResponse.json();
+    assert(debugPerformanceResponse.status === 200, "debug performance should return 200");
+    assert(debugPerformance.ok === true, "debug performance envelope ok should be true");
+
     // eslint-disable-next-line no-console
     console.log(
       JSON.stringify(
@@ -136,6 +145,7 @@ const run = async (): Promise<void> => {
           invalidFetchStatus: invalidFetchResponse.status,
           okFetchStatus: okFetchResponse.status,
           adaptersHealthStatus: adaptersHealthResponse.status,
+          debugPerformanceStatus: debugPerformanceResponse.status,
         },
         null,
         2,
