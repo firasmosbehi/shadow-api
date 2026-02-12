@@ -63,6 +63,7 @@ The initial Apify Actor scaffold is now in place:
 - Actor config: `.actor/actor.json`, `.actor/input_schema.json`
 - Runtime source: `src/main.ts`, `src/config.ts`, `src/server.ts`
 - Warm runtime managers: `src/runtime/browser-pool.ts`, `src/runtime/standby-lifecycle.ts`
+- Session persistence manager: `src/runtime/session-storage.ts`
 - Build/dev config: `package.json`, `tsconfig.json`, `.env.example`, `Dockerfile`
 
 ### Local Quickstart
@@ -92,8 +93,12 @@ Warm pool and standby controls:
 - `STANDBY_IDLE_TIMEOUT_MS`
 - `STANDBY_TICK_INTERVAL_MS`
 - `STANDBY_RECYCLE_AFTER_MS`
+- `SESSION_STORAGE_ENABLED` (`true|false`)
+- `SESSION_STORE_NAME`
+- `SESSION_STORE_KEY_PREFIX`
 
 Note: when browser pool is enabled, a Playwright-compatible browser must be available in runtime.
+Session storage uses Apify Key-Value Store and restores browser storage state by warm-session slot.
 
 ## Repository Structure
 

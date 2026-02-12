@@ -1,15 +1,18 @@
 import { log } from "apify";
 import type { Browser, BrowserContext, Page } from "playwright-core";
+import { SessionStorageManager } from "./session-storage";
 
 export interface BrowserPoolConfig {
   enabled: boolean;
   size: number;
   headless: boolean;
   launchTimeoutMs: number;
+  sessionStorage: SessionStorageManager;
 }
 
 interface WarmSession {
   id: string;
+  slot: number;
   createdAt: number;
   lastWarmedAt: number;
   context: BrowserContext;
@@ -21,6 +24,7 @@ export interface BrowserPoolStatus {
   browserReady: boolean;
   configuredSize: number;
   warmSessionCount: number;
+  persistedSessionEnabled: boolean;
   lastWarmAt: string | null;
 }
 
@@ -53,11 +57,13 @@ export class BrowserPoolManager {
   }
 
   public getStatus(): BrowserPoolStatus {
+    const sessionStorageStatus = this.config.sessionStorage.getStatus();
     return {
       enabled: this.config.enabled,
       browserReady: this.browser !== null,
       configuredSize: this.config.size,
       warmSessionCount: this.sessions.length,
+      persistedSessionEnabled: sessionStorageStatus.enabled,
       lastWarmAt: this.lastWarmAt ? new Date(this.lastWarmAt).toISOString() : null,
     };
   }
@@ -66,20 +72,25 @@ export class BrowserPoolManager {
     if (!this.config.enabled || !this.running) return;
     await this.ensureBrowser();
 
-    while (this.sessions.length < targetSize) {
-      const session = await this.createSession();
+    for (let slot = 0; slot < targetSize; slot += 1) {
+      if (this.sessions.some((session) => session.slot === slot)) continue;
+      const session = await this.createSession(slot);
       this.sessions.push(session);
-      log.debug("Warm browser session created", { sessionId: session.id });
+      log.debug("Warm browser session created", { sessionId: session.id, slot });
     }
+    this.sessions.sort((a, b) => a.slot - b.slot);
   }
 
   public async shrinkTo(targetSize: number): Promise<void> {
     if (!this.config.enabled) return;
-    while (this.sessions.length > targetSize) {
-      const session = this.sessions.pop();
-      if (!session) break;
+    const staleSessions = this.sessions
+      .filter((session) => session.slot >= targetSize)
+      .sort((a, b) => b.slot - a.slot);
+
+    for (const session of staleSessions) {
+      this.sessions = this.sessions.filter((entry) => entry.id !== session.id);
       await this.closeSession(session);
-      log.debug("Warm browser session closed", { sessionId: session.id });
+      log.debug("Warm browser session closed", { sessionId: session.id, slot: session.slot });
     }
   }
 
@@ -89,9 +100,11 @@ export class BrowserPoolManager {
       try {
         await session.page.goto("about:blank", { timeout: this.config.launchTimeoutMs });
         session.lastWarmedAt = Date.now();
+        await this.persistSession(session);
       } catch (error) {
         log.warning("Warm session refresh failed; recreating session.", {
           sessionId: session.id,
+          slot: session.slot,
           error: (error as Error).message,
         });
         await this.replaceSession(session.id);
@@ -128,23 +141,29 @@ export class BrowserPoolManager {
     });
   }
 
-  private async createSession(): Promise<WarmSession> {
+  private async createSession(slot: number): Promise<WarmSession> {
     if (!this.browser) {
       throw new Error("Browser is not initialized.");
     }
 
-    const context = await this.browser.newContext();
+    const persistedState = await this.config.sessionStorage.load(slot);
+    const context = await this.browser.newContext(
+      persistedState ? { storageState: persistedState } : undefined,
+    );
     const page = await context.newPage();
     await page.goto("about:blank", { timeout: this.config.launchTimeoutMs });
 
     const now = Date.now();
-    return {
+    const session: WarmSession = {
       id: `session_${now}_${Math.random().toString(36).slice(2, 8)}`,
+      slot,
       createdAt: now,
       lastWarmedAt: now,
       context,
       page,
     };
+    await this.persistSession(session);
+    return session;
   }
 
   private async replaceSession(sessionId: string): Promise<void> {
@@ -153,7 +172,7 @@ export class BrowserPoolManager {
 
     const oldSession = this.sessions[index];
     await this.closeSession(oldSession);
-    const newSession = await this.createSession();
+    const newSession = await this.createSession(oldSession.slot);
     this.sessions[index] = newSession;
   }
 
@@ -166,12 +185,27 @@ export class BrowserPoolManager {
   }
 
   private async closeSession(session: WarmSession): Promise<void> {
+    await this.persistSession(session);
     await session.context.close().catch((error: unknown) => {
       log.warning("Failed closing browser context.", {
         sessionId: session.id,
+        slot: session.slot,
         error: (error as Error).message,
       });
     });
+  }
+
+  private async persistSession(session: WarmSession): Promise<void> {
+    try {
+      const state = await session.context.storageState();
+      await this.config.sessionStorage.save(session.slot, state);
+    } catch (error) {
+      log.warning("Failed persisting session storage state.", {
+        sessionId: session.id,
+        slot: session.slot,
+        error: (error as Error).message,
+      });
+    }
   }
 
   private async closeBrowser(): Promise<void> {

@@ -81,6 +81,24 @@
       "type": "integer",
       "description": "Recycle warm sessions older than this age.",
       "default": 900000
+    },
+    "sessionStorageEnabled": {
+      "title": "Session storage enabled",
+      "type": "boolean",
+      "description": "Persist and recover browser session state across actor runs.",
+      "default": true
+    },
+    "sessionStoreName": {
+      "title": "Session store name",
+      "type": "string",
+      "description": "Apify Key-Value store name used for persisted session state.",
+      "default": "SHADOW_API_SESSIONS"
+    },
+    "sessionStoreKeyPrefix": {
+      "title": "Session store key prefix",
+      "type": "string",
+      "description": "Prefix for persisted session slot keys.",
+      "default": "session-slot"
     }
   }
 }

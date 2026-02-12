@@ -11,6 +11,9 @@ export interface ActorInput {
   standbyIdleTimeoutMs?: number;
   standbyTickIntervalMs?: number;
   standbyRecycleAfterMs?: number;
+  sessionStorageEnabled?: boolean;
+  sessionStoreName?: string;
+  sessionStoreKeyPrefix?: string;
 }
 
 export interface RuntimeConfig {
@@ -25,4 +28,7 @@ export interface RuntimeConfig {
   standbyIdleTimeoutMs: number;
   standbyTickIntervalMs: number;
   standbyRecycleAfterMs: number;
+  sessionStorageEnabled: boolean;
+  sessionStoreName: string;
+  sessionStoreKeyPrefix: string;
 }

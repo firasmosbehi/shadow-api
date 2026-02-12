@@ -76,6 +76,21 @@ const parseIntegerWithRangeValidation = (
   return parsed;
 };
 
+const parseNonEmptyString = (
+  value: string | undefined,
+  fieldName: string,
+  issues: string[],
+  fallback: string,
+): string => {
+  if (typeof value !== "string") return fallback;
+  const normalized = value.trim();
+  if (!normalized) {
+    issues.push(`\`${fieldName}\` must be a non-empty string.`);
+    return fallback;
+  }
+  return normalized;
+};
+
 export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
   const issues: string[] = [];
 
@@ -91,6 +106,9 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
   const envStandbyIdleTimeoutMs = process.env.STANDBY_IDLE_TIMEOUT_MS;
   const envStandbyTickIntervalMs = process.env.STANDBY_TICK_INTERVAL_MS;
   const envStandbyRecycleAfterMs = process.env.STANDBY_RECYCLE_AFTER_MS;
+  const envSessionStorageEnabled = process.env.SESSION_STORAGE_ENABLED;
+  const envSessionStoreName = process.env.SESSION_STORE_NAME;
+  const envSessionStoreKeyPrefix = process.env.SESSION_STORE_KEY_PREFIX;
 
   const rawHost = input.host ?? envHost ?? "0.0.0.0";
   const host = typeof rawHost === "string" ? rawHost.trim() : "";
@@ -184,6 +202,27 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
     7200000,
   );
 
+  const sessionStorageEnabled = parseBooleanWithValidation(
+    input.sessionStorageEnabled ?? envSessionStorageEnabled,
+    "sessionStorageEnabled",
+    issues,
+    true,
+  );
+
+  const sessionStoreName = parseNonEmptyString(
+    input.sessionStoreName ?? envSessionStoreName,
+    "sessionStoreName",
+    issues,
+    "SHADOW_API_SESSIONS",
+  );
+
+  const sessionStoreKeyPrefix = parseNonEmptyString(
+    input.sessionStoreKeyPrefix ?? envSessionStoreKeyPrefix,
+    "sessionStoreKeyPrefix",
+    issues,
+    "session-slot",
+  );
+
   if (issues.length > 0) {
     throw new ConfigValidationError(issues);
   }
@@ -200,5 +239,8 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
     standbyIdleTimeoutMs,
     standbyTickIntervalMs,
     standbyRecycleAfterMs,
+    sessionStorageEnabled,
+    sessionStoreName,
+    sessionStoreKeyPrefix,
   };
 };

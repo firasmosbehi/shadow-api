@@ -3,6 +3,7 @@ import type { AddressInfo } from "node:net";
 import { buildRuntimeConfig, ConfigValidationError } from "./config";
 import { createApiServer } from "./server";
 import { BrowserPoolManager } from "./runtime/browser-pool";
+import { SessionStorageManager } from "./runtime/session-storage";
 import { StandbyLifecycleController } from "./runtime/standby-lifecycle";
 import type { ActorInput } from "./types";
 
@@ -21,11 +22,19 @@ const run = async (): Promise<void> => {
   const runtime = buildRuntimeConfig(input);
 
   log.setLevel(log.LEVELS[runtime.logLevel]);
+  const sessionStorage = new SessionStorageManager({
+    enabled: runtime.sessionStorageEnabled,
+    storeName: runtime.sessionStoreName,
+    keyPrefix: runtime.sessionStoreKeyPrefix,
+  });
+  await sessionStorage.init();
+
   const browserPool = new BrowserPoolManager({
     enabled: runtime.browserPoolEnabled,
     size: runtime.browserPoolSize,
     headless: runtime.browserHeadless,
     launchTimeoutMs: runtime.browserLaunchTimeoutMs,
+    sessionStorage,
   });
 
   const standby = new StandbyLifecycleController(browserPool, {
@@ -58,6 +67,7 @@ const run = async (): Promise<void> => {
     logLevel: runtime.logLevel,
     browserPoolEnabled: runtime.browserPoolEnabled,
     standbyEnabled: runtime.standbyEnabled,
+    sessionStorageEnabled: runtime.sessionStorageEnabled,
     listeningAddress: address?.address ?? runtime.host,
   });
 
