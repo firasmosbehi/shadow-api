@@ -1,5 +1,6 @@
 import { log } from "apify";
 import type { Browser, BrowserContext, Page } from "playwright-core";
+import { navigateWithRetry, waitForPageReady } from "./navigation";
 import { SessionStorageManager } from "./session-storage";
 
 export interface BrowserPoolConfig {
@@ -98,7 +99,12 @@ export class BrowserPoolManager {
     if (!this.config.enabled || this.sessions.length === 0) return;
     for (const session of this.sessions) {
       try {
-        await session.page.goto("about:blank", { timeout: this.config.launchTimeoutMs });
+        await navigateWithRetry(session.page, "about:blank", {
+          attempts: 2,
+          timeoutMs: this.config.launchTimeoutMs,
+          waitUntil: "domcontentloaded",
+        });
+        await waitForPageReady(session.page, { timeoutMs: this.config.launchTimeoutMs });
         session.lastWarmedAt = Date.now();
         await this.persistSession(session);
       } catch (error) {
@@ -151,7 +157,12 @@ export class BrowserPoolManager {
       persistedState ? { storageState: persistedState } : undefined,
     );
     const page = await context.newPage();
-    await page.goto("about:blank", { timeout: this.config.launchTimeoutMs });
+    await navigateWithRetry(page, "about:blank", {
+      attempts: 2,
+      timeoutMs: this.config.launchTimeoutMs,
+      waitUntil: "domcontentloaded",
+    });
+    await waitForPageReady(page, { timeoutMs: this.config.launchTimeoutMs });
 
     const now = Date.now();
     const session: WarmSession = {

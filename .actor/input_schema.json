@@ -99,6 +99,36 @@
       "type": "string",
       "description": "Prefix for persisted session slot keys.",
       "default": "session-slot"
+    },
+    "requestQueueConcurrency": {
+      "title": "Request queue concurrency",
+      "type": "integer",
+      "description": "Maximum number of queued tasks processed in parallel.",
+      "default": 2
+    },
+    "requestQueueMaxSize": {
+      "title": "Request queue max size",
+      "type": "integer",
+      "description": "Maximum queued tasks before backpressure rejection.",
+      "default": 100
+    },
+    "requestQueueTaskTimeoutMs": {
+      "title": "Request queue task timeout (ms)",
+      "type": "integer",
+      "description": "Max time per queued task before timeout.",
+      "default": 15000
+    },
+    "shutdownDrainTimeoutMs": {
+      "title": "Shutdown drain timeout (ms)",
+      "type": "integer",
+      "description": "Max time to wait for queue drain during shutdown.",
+      "default": 20000
+    },
+    "mockFetchDelayMs": {
+      "title": "Mock fetch delay (ms)",
+      "type": "integer",
+      "description": "Delay used by mocked fetch worker for queue testing.",
+      "default": 150
     }
   }
 }

@@ -109,6 +109,11 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
   const envSessionStorageEnabled = process.env.SESSION_STORAGE_ENABLED;
   const envSessionStoreName = process.env.SESSION_STORE_NAME;
   const envSessionStoreKeyPrefix = process.env.SESSION_STORE_KEY_PREFIX;
+  const envRequestQueueConcurrency = process.env.REQUEST_QUEUE_CONCURRENCY;
+  const envRequestQueueMaxSize = process.env.REQUEST_QUEUE_MAX_SIZE;
+  const envRequestQueueTaskTimeoutMs = process.env.REQUEST_QUEUE_TASK_TIMEOUT_MS;
+  const envShutdownDrainTimeoutMs = process.env.SHUTDOWN_DRAIN_TIMEOUT_MS;
+  const envMockFetchDelayMs = process.env.MOCK_FETCH_DELAY_MS;
 
   const rawHost = input.host ?? envHost ?? "0.0.0.0";
   const host = typeof rawHost === "string" ? rawHost.trim() : "";
@@ -223,6 +228,51 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
     "session-slot",
   );
 
+  const requestQueueConcurrency = parseIntegerWithRangeValidation(
+    input.requestQueueConcurrency ?? envRequestQueueConcurrency,
+    "requestQueueConcurrency",
+    issues,
+    2,
+    1,
+    50,
+  );
+
+  const requestQueueMaxSize = parseIntegerWithRangeValidation(
+    input.requestQueueMaxSize ?? envRequestQueueMaxSize,
+    "requestQueueMaxSize",
+    issues,
+    100,
+    1,
+    10000,
+  );
+
+  const requestQueueTaskTimeoutMs = parseIntegerWithRangeValidation(
+    input.requestQueueTaskTimeoutMs ?? envRequestQueueTaskTimeoutMs,
+    "requestQueueTaskTimeoutMs",
+    issues,
+    15000,
+    1000,
+    600000,
+  );
+
+  const shutdownDrainTimeoutMs = parseIntegerWithRangeValidation(
+    input.shutdownDrainTimeoutMs ?? envShutdownDrainTimeoutMs,
+    "shutdownDrainTimeoutMs",
+    issues,
+    20000,
+    1000,
+    600000,
+  );
+
+  const mockFetchDelayMs = parseIntegerWithRangeValidation(
+    input.mockFetchDelayMs ?? envMockFetchDelayMs,
+    "mockFetchDelayMs",
+    issues,
+    150,
+    0,
+    60000,
+  );
+
   if (issues.length > 0) {
     throw new ConfigValidationError(issues);
   }
@@ -242,5 +292,10 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
     sessionStorageEnabled,
     sessionStoreName,
     sessionStoreKeyPrefix,
+    requestQueueConcurrency,
+    requestQueueMaxSize,
+    requestQueueTaskTimeoutMs,
+    shutdownDrainTimeoutMs,
+    mockFetchDelayMs,
   };
 };

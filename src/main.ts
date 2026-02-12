@@ -3,6 +3,7 @@ import type { AddressInfo } from "node:net";
 import { buildRuntimeConfig, ConfigValidationError } from "./config";
 import { createApiServer } from "./server";
 import { BrowserPoolManager } from "./runtime/browser-pool";
+import { AsyncRequestQueue } from "./runtime/request-queue";
 import { SessionStorageManager } from "./runtime/session-storage";
 import { StandbyLifecycleController } from "./runtime/standby-lifecycle";
 import type { ActorInput } from "./types";
@@ -13,6 +14,11 @@ const closeServer = async (server: ReturnType<typeof createApiServer>): Promise<
       if (error) reject(error);
       else resolve();
     });
+  });
+
+const sleep = async (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
   });
 
 const run = async (): Promise<void> => {
@@ -47,12 +53,36 @@ const run = async (): Promise<void> => {
 
   await standby.start();
 
+  const requestQueue = new AsyncRequestQueue({
+    concurrency: runtime.requestQueueConcurrency,
+    maxSize: runtime.requestQueueMaxSize,
+    taskTimeoutMs: runtime.requestQueueTaskTimeoutMs,
+  });
+
+  let shuttingDown = false;
+
   const server = createApiServer(runtime, {
-    getQueueDepth: () => 0,
+    getQueueDepth: () => requestQueue.getStats().queued,
+    getQueueInflight: () => requestQueue.getStats().inflight,
     getWarmSessions: () => browserPool.getStatus().warmSessionCount,
     getStandbyMode: () => standby.getStatus().mode,
     getStandbyIdleMs: () => standby.getStatus().idleForMs,
+    isShuttingDown: () => shuttingDown,
     onActivity: () => standby.onActivity(),
+    enqueueFetch: async (request) =>
+      requestQueue.enqueue(async () => {
+        await sleep(runtime.mockFetchDelayMs);
+        return {
+          source: request.source,
+          operation: request.operation,
+          target: request.target,
+          fields: request.fields ?? [],
+          freshness: request.freshness ?? "hot",
+          timeout_ms: request.timeout_ms ?? runtime.requestQueueTaskTimeoutMs,
+          fetched_at: new Date().toISOString(),
+          mocked: true,
+        };
+      }),
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -68,20 +98,52 @@ const run = async (): Promise<void> => {
     browserPoolEnabled: runtime.browserPoolEnabled,
     standbyEnabled: runtime.standbyEnabled,
     sessionStorageEnabled: runtime.sessionStorageEnabled,
+    queueConcurrency: runtime.requestQueueConcurrency,
+    queueMaxSize: runtime.requestQueueMaxSize,
+    queueTaskTimeoutMs: runtime.requestQueueTaskTimeoutMs,
+    shutdownDrainTimeoutMs: runtime.shutdownDrainTimeoutMs,
     listeningAddress: address?.address ?? runtime.host,
   });
 
-  Actor.on("aborting", async () => {
-    log.warning("Actor abort signal received. Closing HTTP server.");
+  const shutdown = async (reason: "aborting" | "migrating" | "signal"): Promise<void> => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    requestQueue.pause();
+    log.warning("Shutdown started.", { reason });
+
     await closeServer(server);
+
+    try {
+      await requestQueue.drain(runtime.shutdownDrainTimeoutMs);
+    } catch (error) {
+      log.warning("Queue drain timed out during shutdown.", {
+        reason,
+        timeoutMs: runtime.shutdownDrainTimeoutMs,
+        error: (error as Error).message,
+      });
+    }
+
     await standby.stop();
+  };
+
+  Actor.on("aborting", async () => {
+    await shutdown("aborting");
     await Actor.exit();
   });
 
   Actor.on("migrating", async () => {
-    log.warning("Actor migrating. Closing HTTP server.");
-    await closeServer(server);
-    await standby.stop();
+    await shutdown("migrating");
+  });
+
+  process.on("SIGINT", () => {
+    void shutdown("signal").then(async () => {
+      await Actor.exit();
+    });
+  });
+  process.on("SIGTERM", () => {
+    void shutdown("signal").then(async () => {
+      await Actor.exit();
+    });
   });
 };
 

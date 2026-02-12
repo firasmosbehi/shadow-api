@@ -14,6 +14,11 @@ export interface ActorInput {
   sessionStorageEnabled?: boolean;
   sessionStoreName?: string;
   sessionStoreKeyPrefix?: string;
+  requestQueueConcurrency?: number;
+  requestQueueMaxSize?: number;
+  requestQueueTaskTimeoutMs?: number;
+  shutdownDrainTimeoutMs?: number;
+  mockFetchDelayMs?: number;
 }
 
 export interface RuntimeConfig {
@@ -31,4 +36,9 @@ export interface RuntimeConfig {
   sessionStorageEnabled: boolean;
   sessionStoreName: string;
   sessionStoreKeyPrefix: string;
+  requestQueueConcurrency: number;
+  requestQueueMaxSize: number;
+  requestQueueTaskTimeoutMs: number;
+  shutdownDrainTimeoutMs: number;
+  mockFetchDelayMs: number;
 }

@@ -64,6 +64,10 @@ The initial Apify Actor scaffold is now in place:
 - Runtime source: `src/main.ts`, `src/config.ts`, `src/server.ts`
 - Warm runtime managers: `src/runtime/browser-pool.ts`, `src/runtime/standby-lifecycle.ts`
 - Session persistence manager: `src/runtime/session-storage.ts`
+- Queue + error + nav utilities:
+  - `src/runtime/request-queue.ts`
+  - `src/runtime/errors.ts`
+  - `src/runtime/navigation.ts`
 - Build/dev config: `package.json`, `tsconfig.json`, `.env.example`, `Dockerfile`
 
 ### Local Quickstart
@@ -73,6 +77,7 @@ The initial Apify Actor scaffold is now in place:
 3. Verify endpoints:
    - `GET http://127.0.0.1:3000/v1/health`
    - `GET http://127.0.0.1:3000/v1/ready`
+   - `POST http://127.0.0.1:3000/v1/fetch`
 
 ### Config Validation
 
@@ -96,9 +101,20 @@ Warm pool and standby controls:
 - `SESSION_STORAGE_ENABLED` (`true|false`)
 - `SESSION_STORE_NAME`
 - `SESSION_STORE_KEY_PREFIX`
+- `REQUEST_QUEUE_CONCURRENCY`
+- `REQUEST_QUEUE_MAX_SIZE`
+- `REQUEST_QUEUE_TASK_TIMEOUT_MS`
+- `SHUTDOWN_DRAIN_TIMEOUT_MS`
+- `MOCK_FETCH_DELAY_MS`
 
 Note: when browser pool is enabled, a Playwright-compatible browser must be available in runtime.
 Session storage uses Apify Key-Value Store and restores browser storage state by warm-session slot.
+
+### Dev and Debug Scripts
+
+- `npm run dev:runner` — start local runtime and print health/ready/fetch sample output
+- `npm run smoke:local` — run lightweight endpoint smoke check against a running service
+- `npm run debug:queue` — fire concurrent fetch calls to observe queue/backpressure behavior
 
 ## Repository Structure
 

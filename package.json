@@ -8,7 +8,10 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
     "dev": "tsx src/main.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dev:runner": "tsx scripts/dev-runner.ts",
+    "debug:queue": "tsx scripts/debug-queue.ts",
+    "smoke:local": "tsx scripts/smoke-local.ts"
   },
   "keywords": [
     "apify",
