@@ -22,6 +22,7 @@ export interface ServerRuntimeState {
   getStandbyIdleMs: () => number;
   getAdapterHealth: () => unknown;
   getPerformanceReport: () => unknown;
+  getReliabilityReport: () => unknown;
   isShuttingDown: () => boolean;
   onActivity: () => void;
   enqueueFetch: (request: FetchRequestInput) => Promise<unknown>;
@@ -229,6 +230,19 @@ export const createApiServer = (runtime: RuntimeConfig, state: ServerRuntimeStat
         200,
         createSuccessEnvelope(requestId, {
           performance: state.getPerformanceReport(),
+          queue_depth: state.getQueueDepth(),
+          queue_inflight: state.getQueueInflight(),
+        }),
+      );
+      return;
+    }
+
+    if (method === "GET" && path === "/v1/debug/reliability") {
+      json(
+        res,
+        200,
+        createSuccessEnvelope(requestId, {
+          reliability: state.getReliabilityReport(),
           queue_depth: state.getQueueDepth(),
           queue_inflight: state.getQueueInflight(),
         }),

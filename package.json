@@ -17,7 +17,8 @@
     "generate:openapi": "tsx scripts/generate-openapi.ts",
     "generate:postman": "tsx scripts/generate-postman.ts",
     "generate:api-artifacts": "npm run generate:openapi && npm run generate:postman",
-    "benchmark:hot-path": "tsx scripts/benchmark-hot-path.ts"
+    "benchmark:hot-path": "tsx scripts/benchmark-hot-path.ts",
+    "chaos:drill": "tsx scripts/chaos-drill.ts"
   },
   "keywords": [
     "apify",

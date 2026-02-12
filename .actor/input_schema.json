@@ -242,6 +242,140 @@
       "editor": "json",
       "prefill": []
     },
+    "proxyRotationEnabled": {
+      "title": "Proxy rotation enabled",
+      "type": "boolean",
+      "description": "Enable rotating proxy strategy for outbound fetches.",
+      "default": false
+    },
+    "proxyPoolUrls": {
+      "title": "Proxy pool URLs",
+      "type": "array",
+      "description": "List of proxy URLs used by the rotation pool.",
+      "editor": "stringList",
+      "prefill": []
+    },
+    "proxyQuarantineMs": {
+      "title": "Proxy quarantine (ms)",
+      "type": "integer",
+      "description": "Quarantine duration when a proxy is flagged as blocked.",
+      "default": 300000
+    },
+    "fingerprintRotationEnabled": {
+      "title": "Fingerprint rotation enabled",
+      "type": "boolean",
+      "description": "Rotate user-agent and browser fingerprint profiles.",
+      "default": true
+    },
+    "retryMaxAttempts": {
+      "title": "Retry max attempts",
+      "type": "integer",
+      "description": "Maximum attempts for adaptive retry policy.",
+      "default": 3
+    },
+    "retryBaseDelayMs": {
+      "title": "Retry base delay (ms)",
+      "type": "integer",
+      "description": "Base delay for exponential retry backoff.",
+      "default": 200
+    },
+    "retryMaxDelayMs": {
+      "title": "Retry max delay (ms)",
+      "type": "integer",
+      "description": "Maximum delay allowed by retry backoff policy.",
+      "default": 5000
+    },
+    "retryBlockedDelayMs": {
+      "title": "Retry blocked delay (ms)",
+      "type": "integer",
+      "description": "Delay used for blocked/challenge retry attempts.",
+      "default": 1500
+    },
+    "retryJitterMs": {
+      "title": "Retry jitter (ms)",
+      "type": "integer",
+      "description": "Random jitter added to retry delays.",
+      "default": 250
+    },
+    "circuitBreakerEnabled": {
+      "title": "Circuit breaker enabled",
+      "type": "boolean",
+      "description": "Enable per-source circuit breaker protection.",
+      "default": true
+    },
+    "circuitFailureThreshold": {
+      "title": "Circuit failure threshold",
+      "type": "integer",
+      "description": "Consecutive failures before circuit opens.",
+      "default": 5
+    },
+    "circuitOpenMs": {
+      "title": "Circuit open duration (ms)",
+      "type": "integer",
+      "description": "Duration to keep a circuit open before half-open trial.",
+      "default": 60000
+    },
+    "circuitHalfOpenSuccessThreshold": {
+      "title": "Circuit half-open success threshold",
+      "type": "integer",
+      "description": "Successes required in half-open to close a circuit.",
+      "default": 2
+    },
+    "sourceQuarantineMs": {
+      "title": "Source quarantine (ms)",
+      "type": "integer",
+      "description": "Quarantine duration for blocked sources.",
+      "default": 300000
+    },
+    "fallbackUrlStrategyEnabled": {
+      "title": "Fallback URL strategy enabled",
+      "type": "boolean",
+      "description": "Enable source-specific fallback URL strategies.",
+      "default": true
+    },
+    "checkpointMaxEntries": {
+      "title": "Checkpoint max entries",
+      "type": "integer",
+      "description": "Max checkpoint records kept in memory for long flows.",
+      "default": 500
+    },
+    "deadLetterEnabled": {
+      "title": "Dead-letter enabled",
+      "type": "boolean",
+      "description": "Persist failed jobs to dead-letter queue.",
+      "default": true
+    },
+    "deadLetterStoreName": {
+      "title": "Dead-letter store name",
+      "type": "string",
+      "description": "Key-value store name used for dead-letter entries.",
+      "default": "SHADOW_API_DLQ"
+    },
+    "deadLetterMaxEntries": {
+      "title": "Dead-letter max entries",
+      "type": "integer",
+      "description": "Maximum retained dead-letter entries.",
+      "default": 1000
+    },
+    "incidentBlockedSpikeThreshold": {
+      "title": "Incident blocked spike threshold",
+      "type": "integer",
+      "description": "Blocked events threshold to emit critical incident.",
+      "default": 5
+    },
+    "incidentBlockedSpikeWindowMs": {
+      "title": "Incident blocked spike window (ms)",
+      "type": "integer",
+      "description": "Time window used to detect blocked spikes.",
+      "default": 600000
+    },
+    "incidentWebhookUrl": {
+      "title": "Incident webhook URL",
+      "type": "string",
+      "description": "Optional webhook endpoint for reliability incidents.",
+      "default": "",
+      "isSecret": true
+    },
     "shutdownDrainTimeoutMs": {
       "title": "Shutdown drain timeout (ms)",
       "type": "integer",

@@ -31,6 +31,17 @@ const parseRequiredEnvVars = (
   return [...new Set(envList.split(",").map((entry) => entry.trim()).filter(Boolean))];
 };
 
+const parseStringList = (
+  inputList: string[] | undefined,
+  envList: string | undefined,
+): string[] => {
+  if (Array.isArray(inputList)) {
+    return [...new Set(inputList.map((entry) => String(entry).trim()).filter(Boolean))];
+  }
+  if (!envList) return [];
+  return [...new Set(envList.split(",").map((entry) => entry.trim()).filter(Boolean))];
+};
+
 const parseBooleanWithValidation = (
   value: boolean | string | undefined,
   fieldName: string,
@@ -177,6 +188,28 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
   const envPrewarmTargets = process.env.PREWARM_TARGETS;
   const envBrowserOptimizedFlagsEnabled = process.env.BROWSER_OPTIMIZED_FLAGS_ENABLED;
   const envBrowserBlockResources = process.env.BROWSER_BLOCK_RESOURCES;
+  const envProxyRotationEnabled = process.env.PROXY_ROTATION_ENABLED;
+  const envProxyPoolUrls = process.env.PROXY_POOL_URLS;
+  const envProxyQuarantineMs = process.env.PROXY_QUARANTINE_MS;
+  const envFingerprintRotationEnabled = process.env.FINGERPRINT_ROTATION_ENABLED;
+  const envRetryMaxAttempts = process.env.RETRY_MAX_ATTEMPTS;
+  const envRetryBaseDelayMs = process.env.RETRY_BASE_DELAY_MS;
+  const envRetryMaxDelayMs = process.env.RETRY_MAX_DELAY_MS;
+  const envRetryBlockedDelayMs = process.env.RETRY_BLOCKED_DELAY_MS;
+  const envRetryJitterMs = process.env.RETRY_JITTER_MS;
+  const envCircuitBreakerEnabled = process.env.CIRCUIT_BREAKER_ENABLED;
+  const envCircuitFailureThreshold = process.env.CIRCUIT_FAILURE_THRESHOLD;
+  const envCircuitOpenMs = process.env.CIRCUIT_OPEN_MS;
+  const envCircuitHalfOpenSuccessThreshold = process.env.CIRCUIT_HALF_OPEN_SUCCESS_THRESHOLD;
+  const envSourceQuarantineMs = process.env.SOURCE_QUARANTINE_MS;
+  const envFallbackUrlStrategyEnabled = process.env.FALLBACK_URL_STRATEGY_ENABLED;
+  const envCheckpointMaxEntries = process.env.CHECKPOINT_MAX_ENTRIES;
+  const envDeadLetterEnabled = process.env.DEAD_LETTER_ENABLED;
+  const envDeadLetterStoreName = process.env.DEAD_LETTER_STORE_NAME;
+  const envDeadLetterMaxEntries = process.env.DEAD_LETTER_MAX_ENTRIES;
+  const envIncidentBlockedSpikeThreshold = process.env.INCIDENT_BLOCKED_SPIKE_THRESHOLD;
+  const envIncidentBlockedSpikeWindowMs = process.env.INCIDENT_BLOCKED_SPIKE_WINDOW_MS;
+  const envIncidentWebhookUrl = process.env.INCIDENT_WEBHOOK_URL;
   const envShutdownDrainTimeoutMs = process.env.SHUTDOWN_DRAIN_TIMEOUT_MS;
   const envMockFetchDelayMs = process.env.MOCK_FETCH_DELAY_MS;
 
@@ -489,6 +522,187 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
     true,
   );
 
+  const proxyRotationEnabled = parseBooleanWithValidation(
+    input.proxyRotationEnabled ?? envProxyRotationEnabled,
+    "proxyRotationEnabled",
+    issues,
+    false,
+  );
+
+  const proxyPoolUrls = parseStringList(input.proxyPoolUrls, envProxyPoolUrls);
+  if (proxyRotationEnabled && proxyPoolUrls.length === 0) {
+    issues.push(
+      "`proxyPoolUrls` must contain at least one URL when `proxyRotationEnabled=true`.",
+    );
+  }
+
+  const proxyQuarantineMs = parseIntegerWithRangeValidation(
+    input.proxyQuarantineMs ?? envProxyQuarantineMs,
+    "proxyQuarantineMs",
+    issues,
+    300000,
+    1000,
+    3600000,
+  );
+
+  const fingerprintRotationEnabled = parseBooleanWithValidation(
+    input.fingerprintRotationEnabled ?? envFingerprintRotationEnabled,
+    "fingerprintRotationEnabled",
+    issues,
+    true,
+  );
+
+  const retryMaxAttempts = parseIntegerWithRangeValidation(
+    input.retryMaxAttempts ?? envRetryMaxAttempts,
+    "retryMaxAttempts",
+    issues,
+    3,
+    1,
+    10,
+  );
+
+  const retryBaseDelayMs = parseIntegerWithRangeValidation(
+    input.retryBaseDelayMs ?? envRetryBaseDelayMs,
+    "retryBaseDelayMs",
+    issues,
+    200,
+    0,
+    60000,
+  );
+
+  const retryMaxDelayMs = parseIntegerWithRangeValidation(
+    input.retryMaxDelayMs ?? envRetryMaxDelayMs,
+    "retryMaxDelayMs",
+    issues,
+    5000,
+    0,
+    120000,
+  );
+
+  const retryBlockedDelayMs = parseIntegerWithRangeValidation(
+    input.retryBlockedDelayMs ?? envRetryBlockedDelayMs,
+    "retryBlockedDelayMs",
+    issues,
+    1500,
+    0,
+    120000,
+  );
+
+  const retryJitterMs = parseIntegerWithRangeValidation(
+    input.retryJitterMs ?? envRetryJitterMs,
+    "retryJitterMs",
+    issues,
+    250,
+    0,
+    10000,
+  );
+
+  const circuitBreakerEnabled = parseBooleanWithValidation(
+    input.circuitBreakerEnabled ?? envCircuitBreakerEnabled,
+    "circuitBreakerEnabled",
+    issues,
+    true,
+  );
+
+  const circuitFailureThreshold = parseIntegerWithRangeValidation(
+    input.circuitFailureThreshold ?? envCircuitFailureThreshold,
+    "circuitFailureThreshold",
+    issues,
+    5,
+    1,
+    50,
+  );
+
+  const circuitOpenMs = parseIntegerWithRangeValidation(
+    input.circuitOpenMs ?? envCircuitOpenMs,
+    "circuitOpenMs",
+    issues,
+    60000,
+    1000,
+    3600000,
+  );
+
+  const circuitHalfOpenSuccessThreshold = parseIntegerWithRangeValidation(
+    input.circuitHalfOpenSuccessThreshold ?? envCircuitHalfOpenSuccessThreshold,
+    "circuitHalfOpenSuccessThreshold",
+    issues,
+    2,
+    1,
+    20,
+  );
+
+  const sourceQuarantineMs = parseIntegerWithRangeValidation(
+    input.sourceQuarantineMs ?? envSourceQuarantineMs,
+    "sourceQuarantineMs",
+    issues,
+    300000,
+    1000,
+    3600000,
+  );
+
+  const fallbackUrlStrategyEnabled = parseBooleanWithValidation(
+    input.fallbackUrlStrategyEnabled ?? envFallbackUrlStrategyEnabled,
+    "fallbackUrlStrategyEnabled",
+    issues,
+    true,
+  );
+
+  const checkpointMaxEntries = parseIntegerWithRangeValidation(
+    input.checkpointMaxEntries ?? envCheckpointMaxEntries,
+    "checkpointMaxEntries",
+    issues,
+    500,
+    50,
+    20000,
+  );
+
+  const deadLetterEnabled = parseBooleanWithValidation(
+    input.deadLetterEnabled ?? envDeadLetterEnabled,
+    "deadLetterEnabled",
+    issues,
+    true,
+  );
+
+  const deadLetterStoreName = parseNonEmptyString(
+    input.deadLetterStoreName ?? envDeadLetterStoreName,
+    "deadLetterStoreName",
+    issues,
+    "SHADOW_API_DLQ",
+  );
+
+  const deadLetterMaxEntries = parseIntegerWithRangeValidation(
+    input.deadLetterMaxEntries ?? envDeadLetterMaxEntries,
+    "deadLetterMaxEntries",
+    issues,
+    1000,
+    1,
+    50000,
+  );
+
+  const incidentBlockedSpikeThreshold = parseIntegerWithRangeValidation(
+    input.incidentBlockedSpikeThreshold ?? envIncidentBlockedSpikeThreshold,
+    "incidentBlockedSpikeThreshold",
+    issues,
+    5,
+    1,
+    1000,
+  );
+
+  const incidentBlockedSpikeWindowMs = parseIntegerWithRangeValidation(
+    input.incidentBlockedSpikeWindowMs ?? envIncidentBlockedSpikeWindowMs,
+    "incidentBlockedSpikeWindowMs",
+    issues,
+    600000,
+    1000,
+    86400000,
+  );
+
+  const incidentWebhookUrlRaw = input.incidentWebhookUrl ?? envIncidentWebhookUrl;
+  const incidentWebhookUrl =
+    typeof incidentWebhookUrlRaw === "string" && incidentWebhookUrlRaw.trim().length > 0
+      ? incidentWebhookUrlRaw.trim()
+      : null;
+
   const shutdownDrainTimeoutMs = parseIntegerWithRangeValidation(
     input.shutdownDrainTimeoutMs ?? envShutdownDrainTimeoutMs,
     "shutdownDrainTimeoutMs",
@@ -548,6 +762,28 @@ export const buildRuntimeConfig = (input: ActorInput): RuntimeConfig => {
     prewarmTargets,
     browserOptimizedFlagsEnabled,
     browserBlockResources,
+    proxyRotationEnabled,
+    proxyPoolUrls,
+    proxyQuarantineMs,
+    fingerprintRotationEnabled,
+    retryMaxAttempts,
+    retryBaseDelayMs,
+    retryMaxDelayMs,
+    retryBlockedDelayMs,
+    retryJitterMs,
+    circuitBreakerEnabled,
+    circuitFailureThreshold,
+    circuitOpenMs,
+    circuitHalfOpenSuccessThreshold,
+    sourceQuarantineMs,
+    fallbackUrlStrategyEnabled,
+    checkpointMaxEntries,
+    deadLetterEnabled,
+    deadLetterStoreName,
+    deadLetterMaxEntries,
+    incidentBlockedSpikeThreshold,
+    incidentBlockedSpikeWindowMs,
+    incidentWebhookUrl,
     shutdownDrainTimeoutMs,
     mockFetchDelayMs,
   };

@@ -1,5 +1,4 @@
 import { log } from "apify";
-import type { ExtractionService } from "../extraction/service";
 import type { ExtractionResult, FetchRequestInput } from "../extraction/types";
 import { InflightDeduper } from "./inflight-dedupe";
 import { LatencyMetricsTracker } from "./latency-metrics";
@@ -29,7 +28,7 @@ const readBenchmarkTag = (target: Record<string, unknown>): string | undefined =
 };
 
 export interface FetchPipelineConfig {
-  extractionService: ExtractionService;
+  executor: { execute: (request: FetchRequestInput) => Promise<ExtractionResult> };
   cache: ResponseCache<ExtractionResult>;
   fastModeEnabled: boolean;
   fastModeMaxFields: number;
@@ -48,7 +47,7 @@ export interface FetchPipelineReport {
 }
 
 export class FetchPipeline {
-  private readonly extractionService: ExtractionService;
+  private readonly executor: { execute: (request: FetchRequestInput) => Promise<ExtractionResult> };
   private readonly cache: ResponseCache<ExtractionResult>;
   private readonly deduper = new InflightDeduper();
   private readonly latencyMetrics: LatencyMetricsTracker;
@@ -56,7 +55,7 @@ export class FetchPipeline {
   private readonly fastModeMaxFields: number;
 
   public constructor(config: FetchPipelineConfig) {
-    this.extractionService = config.extractionService;
+    this.executor = config.executor;
     this.cache = config.cache;
     this.fastModeEnabled = config.fastModeEnabled;
     this.fastModeMaxFields = config.fastModeMaxFields;
@@ -141,7 +140,7 @@ export class FetchPipeline {
     const dedupeKey = cacheMode === "bypass" ? `bypass:${cacheKey}` : cacheKey;
     const dedupeStarted = Date.now();
     const run = this.deduper.run(dedupeKey, async () => {
-      const extracted = await this.extractionService.execute(normalized.request);
+      const extracted = await this.executor.execute(normalized.request);
       if (shouldWriteCache) {
         await this.cache.set(cacheKey, extracted);
       }
@@ -165,7 +164,7 @@ export class FetchPipeline {
 
   private triggerBackgroundRefresh(key: string, request: FetchRequestInput): boolean {
     const run = this.deduper.run(key, async () => {
-      const refreshed = await this.extractionService.execute({
+      const refreshed = await this.executor.execute({
         ...request,
         cache_mode: "refresh",
       });

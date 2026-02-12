@@ -12,6 +12,14 @@ import { createCacheProvider } from "./performance/cache-provider";
 import { FetchPipeline } from "./performance/fetch-pipeline";
 import { PrewarmScheduler } from "./performance/prewarm-scheduler";
 import { ResponseCache } from "./performance/response-cache";
+import { CheckpointStore } from "./reliability/checkpoint-store";
+import { CircuitBreakerRegistry } from "./reliability/circuit-breaker";
+import { DeadLetterQueue } from "./reliability/dead-letter-queue";
+import { FingerprintRotator } from "./reliability/fingerprint-rotation";
+import { IncidentReporter } from "./reliability/incident-reporter";
+import { RotatingProxyPool } from "./reliability/proxy-rotation";
+import { QuarantineRegistry } from "./reliability/quarantine";
+import { ResilientExecutor } from "./reliability/resilient-executor";
 import type { ActorInput } from "./types";
 
 const closeServer = async (server: ReturnType<typeof createApiServer>): Promise<void> =>
@@ -100,6 +108,54 @@ const run = async (): Promise<void> => {
     defaultTimeoutMs: runtime.fetchTimeoutDefaultMs,
     maxTimeoutMs: runtime.fetchTimeoutMaxMs,
   });
+  const circuitBreakers = new CircuitBreakerRegistry({
+    enabled: runtime.circuitBreakerEnabled,
+    failureThreshold: runtime.circuitFailureThreshold,
+    openMs: runtime.circuitOpenMs,
+    halfOpenSuccessThreshold: runtime.circuitHalfOpenSuccessThreshold,
+  });
+  const proxyPool = new RotatingProxyPool({
+    enabled: runtime.proxyRotationEnabled,
+    proxyUrls: runtime.proxyPoolUrls,
+    quarantineMs: runtime.proxyQuarantineMs,
+  });
+  const fingerprintRotator = new FingerprintRotator({
+    enabled: runtime.fingerprintRotationEnabled,
+  });
+  const quarantine = new QuarantineRegistry();
+  const checkpointStore = new CheckpointStore(runtime.checkpointMaxEntries);
+  const deadLetterQueue = new DeadLetterQueue({
+    enabled: runtime.deadLetterEnabled,
+    storeName: runtime.deadLetterStoreName,
+    maxEntries: runtime.deadLetterMaxEntries,
+  });
+  await deadLetterQueue.init();
+  const incidentReporter = new IncidentReporter({
+    blockedSpikeThreshold: runtime.incidentBlockedSpikeThreshold,
+    blockedSpikeWindowMs: runtime.incidentBlockedSpikeWindowMs,
+    webhookUrl: runtime.incidentWebhookUrl,
+    maxRecentEvents: 50,
+  });
+  const resilientExecutor = new ResilientExecutor({
+    extractionService,
+    retryConfig: {
+      maxAttempts: runtime.retryMaxAttempts,
+      baseDelayMs: runtime.retryBaseDelayMs,
+      maxDelayMs: runtime.retryMaxDelayMs,
+      blockedDelayMs: runtime.retryBlockedDelayMs,
+      jitterMs: runtime.retryJitterMs,
+    },
+    circuitBreakers,
+    proxyPool,
+    fingerprintRotator,
+    quarantine,
+    checkpointStore,
+    deadLetterQueue,
+    incidentReporter,
+    sourceQuarantineMs: runtime.sourceQuarantineMs,
+    proxyQuarantineMs: runtime.proxyQuarantineMs,
+    fallbackUrlStrategyEnabled: runtime.fallbackUrlStrategyEnabled,
+  });
   const cacheProvider = await createCacheProvider<ExtractionResult>({
     provider: runtime.cacheProvider,
     redisUrl: runtime.redisUrl,
@@ -112,7 +168,7 @@ const run = async (): Promise<void> => {
     staleWhileRevalidate: runtime.cacheSwrEnabled,
   });
   const fetchPipeline = new FetchPipeline({
-    extractionService,
+    executor: resilientExecutor,
     cache: responseCache,
     fastModeEnabled: runtime.fastModeEnabled,
     fastModeMaxFields: runtime.fastModeMaxFields,
@@ -138,6 +194,7 @@ const run = async (): Promise<void> => {
       pipeline: fetchPipeline.getReport(),
       prewarm: prewarmScheduler.getStats(),
     }),
+    getReliabilityReport: () => resilientExecutor.snapshot(),
     isShuttingDown: () => shuttingDown,
     onActivity: () => standby.onActivity(),
     enqueueFetch: async (request) =>
@@ -179,6 +236,28 @@ const run = async (): Promise<void> => {
     prewarmTargetsCount: runtime.prewarmTargets.length,
     browserOptimizedFlagsEnabled: runtime.browserOptimizedFlagsEnabled,
     browserBlockResources: runtime.browserBlockResources,
+    proxyRotationEnabled: runtime.proxyRotationEnabled,
+    proxyPoolSize: runtime.proxyPoolUrls.length,
+    proxyQuarantineMs: runtime.proxyQuarantineMs,
+    fingerprintRotationEnabled: runtime.fingerprintRotationEnabled,
+    retryMaxAttempts: runtime.retryMaxAttempts,
+    retryBaseDelayMs: runtime.retryBaseDelayMs,
+    retryMaxDelayMs: runtime.retryMaxDelayMs,
+    retryBlockedDelayMs: runtime.retryBlockedDelayMs,
+    retryJitterMs: runtime.retryJitterMs,
+    circuitBreakerEnabled: runtime.circuitBreakerEnabled,
+    circuitFailureThreshold: runtime.circuitFailureThreshold,
+    circuitOpenMs: runtime.circuitOpenMs,
+    circuitHalfOpenSuccessThreshold: runtime.circuitHalfOpenSuccessThreshold,
+    sourceQuarantineMs: runtime.sourceQuarantineMs,
+    fallbackUrlStrategyEnabled: runtime.fallbackUrlStrategyEnabled,
+    checkpointMaxEntries: runtime.checkpointMaxEntries,
+    deadLetterEnabled: runtime.deadLetterEnabled,
+    deadLetterStoreName: runtime.deadLetterStoreName,
+    deadLetterMaxEntries: runtime.deadLetterMaxEntries,
+    incidentBlockedSpikeThreshold: runtime.incidentBlockedSpikeThreshold,
+    incidentBlockedSpikeWindowMs: runtime.incidentBlockedSpikeWindowMs,
+    incidentWebhookEnabled: Boolean(runtime.incidentWebhookUrl),
     shutdownDrainTimeoutMs: runtime.shutdownDrainTimeoutMs,
     listeningAddress: address?.address ?? runtime.host,
   });

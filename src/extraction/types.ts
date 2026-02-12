@@ -86,6 +86,9 @@ export interface ExtractionResult {
     deduped: boolean;
     fast_mode: boolean;
     benchmark_tag?: string;
+    retry_attempt?: number;
+    proxy_id?: string | null;
+    fingerprint_id?: string | null;
   };
   fetched_at: string;
 }

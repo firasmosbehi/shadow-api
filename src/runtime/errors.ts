@@ -5,7 +5,9 @@ export type AppErrorCode =
   | "VALIDATION_ERROR"
   | "SOURCE_NOT_SUPPORTED"
   | "OPERATION_NOT_SUPPORTED"
+  | "SOURCE_QUARANTINED"
   | "SOURCE_BLOCKED"
+  | "CIRCUIT_OPEN"
   | "QUEUE_BACKPRESSURE"
   | "QUEUE_CLOSED"
   | "QUEUE_TIMEOUT"
@@ -110,6 +112,32 @@ export class SourceBlockedError extends AppError {
       details: details ?? null,
     });
     this.name = "SourceBlockedError";
+  }
+}
+
+export class SourceQuarantinedError extends AppError {
+  public constructor(source: string, details?: Record<string, unknown>) {
+    super({
+      code: "SOURCE_QUARANTINED",
+      message: `Source '${source}' is temporarily quarantined due to blocking risk.`,
+      statusCode: 503,
+      retryable: true,
+      details: details ?? { source },
+    });
+    this.name = "SourceQuarantinedError";
+  }
+}
+
+export class CircuitOpenError extends AppError {
+  public constructor(source: string, details?: Record<string, unknown>) {
+    super({
+      code: "CIRCUIT_OPEN",
+      message: `Circuit breaker is open for source '${source}'.`,
+      statusCode: 503,
+      retryable: true,
+      details: details ?? { source },
+    });
+    this.name = "CircuitOpenError";
   }
 }
 
